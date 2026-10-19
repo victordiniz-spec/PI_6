@@ -6,9 +6,18 @@ import {
   ScanLine,
   Ellipsis,
 } from "lucide-react-native";
+
 import { Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
+  const bottomPadding =
+    Platform.OS === "android"
+      ? Math.max(insets.bottom, 12)
+      : Math.max(insets.bottom, 20);
+
   return (
     <Tabs
       screenOptions={{
@@ -20,15 +29,26 @@ export default function TabsLayout() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "600",
+          marginTop: 2,
+        },
+
+        tabBarIconStyle: {
+          marginTop: 2,
         },
 
         tabBarStyle: {
           backgroundColor: "#FFFFFF",
           borderTopColor: "#E2E8F0",
           borderTopWidth: 1,
-          height: Platform.OS === "ios" ? 85 : 65,
-          paddingTop: 7,
-          paddingBottom: Platform.OS === "ios" ? 22 : 8,
+
+          // Espaço para os botões do Android
+          paddingBottom: bottomPadding,
+
+          // Altura considerando a área segura
+          height: 58 + bottomPadding,
+
+          paddingTop: 6,
+          elevation: 5,
         },
       }}
     >
