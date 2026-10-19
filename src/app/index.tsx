@@ -1,5 +1,7 @@
+
 import { Boxes } from "lucide-react-native";
 import { useState } from "react";
+import { useRouter } from "expo-router";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -14,19 +16,38 @@ import { TextField } from "@/components/forms/TextField";
 import { Button } from "@/components/ui/Button";
 import { colors } from "@/theme/colors";
 
+// Credenciais temporárias para desenvolvimento
+const TEST_USER = "operador";
+const TEST_PASSWORD = "Teste@123";
+
 export default function LoginScreen() {
+  const router = useRouter();
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   const passwordIsValid = password.length >= 8;
+
   const formIsValid =
     username.trim().length > 0 && passwordIsValid;
 
   function handleLogin() {
-    Alert.alert(
-      "PRODSYNC",
-      "Tela de login configurada. A autenticação será integrada na próxima etapa."
-    );
+    const validUser =
+      username.trim() === TEST_USER;
+
+    const validPassword =
+      password === TEST_PASSWORD;
+
+    if (!validUser || !validPassword) {
+      Alert.alert(
+        "Erro no login",
+        "Usuário ou senha incorretos."
+      );
+      return;
+    }
+
+    // Abre a Home e retira o login do histórico
+    router.replace("/(tabs)");
   }
 
   return (
@@ -42,13 +63,11 @@ export default function LoginScreen() {
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{
-            flexGrow: 1,
-          }}
+          contentContainerStyle={{ flexGrow: 1 }}
         >
           <View className="w-full max-w-[440px] flex-1 self-center bg-navy-700">
-            <View className="min-h-[380px] flex-1 items-center justify-center px-6 py-12">
 
+            <View className="min-h-[380px] flex-1 items-center justify-center px-6 py-12">
               <View className="h-16 w-16 items-center justify-center rounded-2xl bg-white/15">
                 <Boxes
                   size={34}
@@ -119,7 +138,7 @@ export default function LoginScreen() {
 
               <View className="mt-7 items-center">
                 <Text className="text-xs text-slate-400">
-                  Acesso via credenciais do Sankhya ERP
+                  Ambiente de desenvolvimento
                 </Text>
 
                 <Text className="mt-1 text-xs font-semibold text-primary-600">
