@@ -2,14 +2,14 @@
 import { Tabs } from "expo-router";
 
 import {
+  Ellipsis,
   House,
   List,
   ScanLine,
-  Ellipsis,
 } from "lucide-react-native";
 
-import type { ComponentType } from "react";
 import type { LucideProps } from "lucide-react-native";
+import type { ComponentType } from "react";
 
 import {
   Platform,
@@ -20,7 +20,7 @@ import {
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// Cores do Figma
+// Cores utilizadas no Figma do PRODSYNC
 const theme = {
   navy: "#123450",
   muted: "#5B6E7C",
@@ -35,7 +35,7 @@ type TabIconProps = {
   IconComponent: ComponentType<LucideProps>;
 };
 
-// Componente dos ícones
+// Componente reutilizável para os ícones
 function TabIcon({
   color,
   focused,
@@ -57,10 +57,11 @@ function TabIcon({
   );
 }
 
+// Navegação inferior do PRODSYNC
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
 
-  // Evita sobreposição com a navegação do Android
+  // Espaço reservado para a navegação do Android/iOS
   const bottomPadding =
     Platform.OS === "android"
       ? Math.max(insets.bottom, 12)
@@ -68,11 +69,11 @@ export default function TabsLayout() {
 
   return (
     <Tabs
-      initialRouteName="index"
       screenOptions={{
+        // Oculta o cabeçalho padrão
         headerShown: false,
 
-        // Cores da navbar
+        // Cores da navegação
         tabBarActiveTintColor: theme.navy,
         tabBarInactiveTintColor: theme.muted,
 
@@ -82,31 +83,36 @@ export default function TabsLayout() {
           borderTopWidth: 0,
           elevation: 0,
 
+          // Altura adaptada à área segura
           height: 66 + bottomPadding,
           paddingTop: 8,
           paddingBottom: bottomPadding,
         },
 
+        // Espaçamento dos itens
         tabBarItemStyle: {
           paddingVertical: 2,
         },
 
+        // Estilo dos nomes das abas
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: "500",
           marginTop: 3,
         },
 
+        // Espaçamento dos ícones
         tabBarIconStyle: {
           marginTop: 2,
         },
       }}
     >
-      {/* HOME */}
+      {/* ABA INÍCIO */}
       <Tabs.Screen
         name="index"
         options={{
           title: "Início",
+
           tabBarIcon: ({ color, focused }) => (
             <TabIcon
               color={color}
@@ -117,11 +123,12 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* ORDENS */}
+      {/* ABA ORDENS */}
       <Tabs.Screen
         name="ordens"
         options={{
           title: "Ordens",
+
           tabBarIcon: ({ color, focused }) => (
             <TabIcon
               color={color}
@@ -132,11 +139,12 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* BIPAGEM */}
+      {/* ABA BIPAGEM */}
       <Tabs.Screen
         name="bipagem"
         options={{
           title: "Bipagem",
+
           tabBarIcon: ({ color, focused }) => (
             <TabIcon
               color={color}
@@ -147,11 +155,12 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* MAIS */}
+      {/* ABA MAIS */}
       <Tabs.Screen
         name="mais"
         options={{
           title: "Mais",
+
           tabBarIcon: ({ color, focused }) => (
             <TabIcon
               color={color}
@@ -165,6 +174,7 @@ export default function TabsLayout() {
   );
 }
 
+// Estilos dos ícones
 const styles = StyleSheet.create({
   iconContainer: {
     width: 60,

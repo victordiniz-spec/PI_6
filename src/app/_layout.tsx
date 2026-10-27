@@ -8,12 +8,11 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <StatusBar
-        style="auto"
-      />
+      {/* Barra de status do dispositivo */}
+      <StatusBar style="auto" />
 
+      {/* Navegação principal do PRODSYNC */}
       <Stack
-        initialRouteName="index"
         screenOptions={{
           headerShown: false,
           animation: "fade",
@@ -30,9 +29,17 @@ export default function RootLayout() {
           }}
         />
 
-        {/* Telas principais com navbar inferior */}
+        {/* Home e navegação inferior */}
         <Stack.Screen
           name="(tabs)"
+          options={{
+            headerShown: false,
+          }}
+        />
+
+        {/* Detalhes da Ordem de Produção */}
+        <Stack.Screen
+          name="ordem/[id]"
           options={{
             headerShown: false,
           }}

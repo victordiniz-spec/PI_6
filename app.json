@@ -26,13 +26,22 @@
     "plugins": [
       "expo-router",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Permitir que o PRODSYNC use a câmera para ler códigos QR",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
