@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { colors } from "@/theme/colors";
 
 export default function MaisScreen() {
   const router = useRouter();
@@ -35,7 +36,7 @@ export default function MaisScreen() {
       edges={["top"]}
       style={{
         flex: 1,
-        backgroundColor: "#F1F5F9",
+        backgroundColor: colors.background,
         padding: 20,
       }}
     >
