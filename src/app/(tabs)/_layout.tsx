@@ -3,7 +3,6 @@ import { Tabs } from "expo-router";
 import {
   House,
   List,
-  ScanLine,
   Ellipsis,
 } from "lucide-react-native";
 
@@ -75,10 +74,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="bipagem"
         options={{
-          title: "Bipagem",
-          tabBarIcon: ({ color, size }) => (
-            <ScanLine size={size} color={color} />
-          ),
+          href: null,
         }}
       />
 
@@ -94,3 +90,4 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+

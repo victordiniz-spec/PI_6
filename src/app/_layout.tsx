@@ -29,7 +29,9 @@ export default function RootLayout() {
             headerShown: false,
           }}
         />
+        <Stack.Screen name="ordem/[id]" options={{ headerShown: false }} />
       </Stack>
     </SafeAreaProvider>
   );
 }
+
