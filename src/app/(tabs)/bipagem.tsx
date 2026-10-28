@@ -29,7 +29,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 // Cores do Figma do PRODSYNC
 const theme = {
-  background: "#F3F6F8",
+  background: "#D3DCE6",
   navy: "#123450",
   ink: "#172F42",
   muted: "#5B6E7C",

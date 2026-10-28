@@ -13,7 +13,7 @@ export const colors = {
     600: "#009BB5",
   },
 
-  background: "#E3E9F0",
+  background: "#D3DCE6",
   surface: "#FFFFFF",
 
   success: "#16A34A",

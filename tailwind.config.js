@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class",
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
 
   presets: [require("nativewind/preset")],
@@ -26,7 +27,7 @@ module.exports = {
         danger: "#DC2626",
 
         surface: "#FFFFFF",
-        background: "#F2F6FB",
+        background: "#D3DCE6",
       },
 
       borderRadius: {
