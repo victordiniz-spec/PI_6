@@ -8,11 +8,19 @@ datasource db {
   provider = "postgresql"
 }
 
+// ==========================================
+// PERFIS DE USUÁRIOS
+// ==========================================
+
 enum PerfilUsuario {
   ADMIN
   SUPERVISOR
   OPERADOR
 }
+
+// ==========================================
+// USUÁRIOS
+// ==========================================
 
 model Usuario {
   id           String        @id @default(uuid())
@@ -28,6 +36,10 @@ model Usuario {
   @@map("usuarios")
 }
 
+// ==========================================
+// PRODUTOS
+// ==========================================
+
 model Produto {
   id           String   @id @default(uuid())
   codigo       String   @unique
@@ -38,8 +50,60 @@ model Produto {
   espessuraMm  Int?
   unidade      String   @default("UN")
   ativo        Boolean  @default(true)
+
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
+  // Um produto pode participar de várias OPs
+  ordensProducao OrdemProducao[]
+
   @@map("produtos")
+}
+
+// ==========================================
+// SITUAÇÕES DAS ORDENS DE PRODUÇÃO
+// ==========================================
+
+enum SituacaoOP {
+  PENDENTE
+  EM_PRODUCAO
+  PAUSADA
+  FINALIZADA
+  CANCELADA
+}
+
+// ==========================================
+// ORDENS DE PRODUÇÃO
+// ==========================================
+
+model OrdemProducao {
+  id                  String     @id @default(uuid())
+  numero              String     @unique
+
+  // Produto associado à OP
+  produtoId           String
+  produto             Produto    @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+
+  // Quantidades
+  quantidadePlanejada Int
+  quantidadeProduzida Int        @default(0)
+
+  // Situação da produção
+  situacao            SituacaoOP @default(PENDENTE)
+
+  // Informações adicionais
+  observacoes         String?
+  dataPrevisao        DateTime?
+  iniciadaEm          DateTime?
+  finalizadaEm        DateTime?
+
+  // Auditoria básica
+  criadoEm            DateTime   @default(now())
+  atualizadoEm        DateTime   @updatedAt
+
+  // Índices de consulta
+  @@index([produtoId])
+  @@index([situacao])
+
+  @@map("ordens_producao")
 }
