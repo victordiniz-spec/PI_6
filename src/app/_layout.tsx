@@ -2,19 +2,26 @@
 import "../../global.css";
 
 import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
+      {/* Barra de status do dispositivo */}
+      <StatusBar style="auto" />
+
+      {/* Navegação principal do PRODSYNC */}
       <Stack
-        initialRouteName="index"
         screenOptions={{
           headerShown: false,
           animation: "fade",
+          contentStyle: {
+            backgroundColor: "#F3F6F8",
+          },
         }}
       >
-        {/* Tela de login */}
+        {/* Tela de Login */}
         <Stack.Screen
           name="index"
           options={{
@@ -22,16 +29,22 @@ export default function RootLayout() {
           }}
         />
 
-        {/* Telas principais com navbar inferior */}
+        {/* Home e navegação inferior */}
         <Stack.Screen
           name="(tabs)"
           options={{
             headerShown: false,
           }}
         />
-        <Stack.Screen name="ordem/[id]" options={{ headerShown: false }} />
+
+        {/* Detalhes da Ordem de Produção */}
+        <Stack.Screen
+          name="ordem/[id]"
+          options={{
+            headerShown: false,
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );
 }
-

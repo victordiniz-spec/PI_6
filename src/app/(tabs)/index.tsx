@@ -1,79 +1,282 @@
+import { useRouter, type Href } from "expo-router";
+import { Search, X } from "lucide-react-native";
 import { useState } from "react";
-import { useRouter } from "expo-router";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import { ClipboardList, QrCode, Search, X } from "lucide-react-native";
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors } from "@/theme/colors";
+
+const theme = {
+  background: "#F3F6F8",
+  navy: "#123450",
+  ink: "#172F42",
+  muted: "#5B6E7C",
+  teal: "#007F80",
+  white: "#FFFFFF",
+  border: "#DCE5EB",
+  success: "#167046",
+  successBg: "#E6F5EC",
+};
+
+// Dados apenas para reproduzir o protótipo do Figma.
+// Troque por false para exibir uma Home sem OP selecionada.
+const DEMO_MODE = true;
+
+const demoOrder = {
+  number: "2026-0148",
+  product: "Forro PVC branco",
+  code: "PVC-001",
+  status: "Em produção",
+  quantity: 600,
+  pendingPackages: 6,
+};
+
+type ActionButtonProps = {
+  title: string;
+  secondary?: boolean;
+  onPress: () => void;
+};
+
+function ActionButton({ title, secondary = false, onPress }: ActionButtonProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.actionButton,
+        secondary ? styles.secondaryButton : styles.primaryButton,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.actionText, secondary ? styles.secondaryText : styles.primaryText]}>
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
+
+function MetricCard({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.metricCard}>
+      <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [permission, requestPermission] = useCameraPermissions();
+  const [searchOpen, setSearchOpen] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [scanned, setScanned] = useState(false);
+  const selectedOrder = DEMO_MODE ? demoOrder : null;
 
-  function openOrder(value: string) {
-    const id = value.match(/[0-9A-Za-z-]+/g)?.at(-1) ?? "";
-    if (!id) return;
-    setScannerOpen(false);
-    setScanned(false);
-    router.push({ pathname: "/ordem/[id]", params: { id } });
-  }
-
-  function searchOrder() {
-    const value = orderNumber.trim().replace(/[^0-9A-Za-z-]/g, "");
-    if (value) openOrder(value);
-  }
-
-  async function openScanner() {
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) return;
+  function openOrderDetails(value: string) {
+    const id = value.trim();
+    if (!/^[A-Za-z0-9-]{1,40}$/.test(id)) {
+      Alert.alert("Número inválido", "Digite uma OP com letras, números ou hífen.");
+      return;
     }
-    setScanned(false);
-    setScannerOpen(true);
+    setSearchOpen(false);
+    setOrderNumber("");
+    router.push(`/ordem/${encodeURIComponent(id)}` as Href);
   }
 
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView contentContainerStyle={{ padding: 22, gap: 18 }}>
-        <View style={{ paddingVertical: 8 }}>
-          <Text style={{ color: colors.navy[700], fontSize: 28, fontWeight: "800" }}>Olá, operador</Text>
-          <Text style={{ color: colors.text.secondary, fontSize: 15, marginTop: 6 }}>Localize uma ordem para começar a produção.</Text>
+    <SafeAreaView edges={["top"]} style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.brand}>PRODSYNC / JM FORROS</Text>
+        <Text style={styles.pageTitle}>Início</Text>
+      </View>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.greeting}>Bom dia, Carlos.</Text>
+
+        <View style={styles.connectionStatus}>
+          <Text style={styles.connectionText}>
+            {DEMO_MODE
+              ? "✓ Sankhya disponível · simulado"
+              : "Sankhya ainda não conectado"}
+          </Text>
         </View>
-        <Pressable onPress={openScanner} style={{ backgroundColor: colors.navy[700], borderRadius: 20, padding: 22, minHeight: 150, justifyContent: "space-between" }}>
-          <QrCode size={38} color="#FFFFFF" />
-          <View><Text style={{ color: "white", fontSize: 21, fontWeight: "800" }}>Ler código da OP</Text><Text style={{ color: "#D9EEF8", marginTop: 5 }}>Abre a câmera aqui para ler o QR Code da ordem</Text></View>
-        </Pressable>
-        <View style={{ backgroundColor: colors.surface, borderRadius: 20, padding: 18, gap: 12 }}>
-          <Text style={{ color: colors.text.primary, fontSize: 18, fontWeight: "800" }}>Digitar número da OP</Text>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <TextInput value={orderNumber} onChangeText={setOrderNumber} onSubmitEditing={searchOrder} placeholder="Ex.: 10245" placeholderTextColor={colors.text.muted} style={{ flex: 1, height: 54, borderWidth: 1, borderColor: "#B8C3D1", borderRadius: 12, paddingHorizontal: 16, fontSize: 16, backgroundColor: "#F8FAFC" }} />
-            <Pressable onPress={searchOrder} style={{ width: 54, height: 54, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary[500] }}><Search size={24} color="white" /></Pressable>
+
+        <ActionButton title="Consultar OP" onPress={() => setSearchOpen(true)} />
+        <ActionButton
+          title="Ler código da OP"
+          secondary
+          onPress={() => router.push("/(tabs)/bipagem")}
+        />
+
+        <Text style={styles.sectionTitle}>Ordem selecionada</Text>
+
+        {selectedOrder ? (
+          <Pressable
+            style={styles.orderCard}
+            onPress={() => openOrderDetails(selectedOrder.number)}
+          >
+            <Text style={styles.orderTitle}>OP {selectedOrder.number}</Text>
+            <Text style={styles.orderDescription}>
+              {selectedOrder.product} · {selectedOrder.code}
+            </Text>
+            <Text style={styles.orderStatus}>● {selectedOrder.status}</Text>
+            <Text style={styles.orderHint}>Toque para acompanhar a ordem (teste)</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.orderCard}>
+            <Text style={styles.orderTitle}>Nenhuma ordem selecionada</Text>
+            <Text style={styles.orderDescription}>
+              Consulte uma OP para visualizar as informações.
+            </Text>
           </View>
-          <Text style={{ color: colors.text.secondary, fontSize: 13 }}>Ao pesquisar, você irá direto para os detalhes da OP.</Text>
+        )}
+
+        <View style={styles.metricsContainer}>
+          <MetricCard
+            value={selectedOrder ? String(selectedOrder.quantity) : "—"}
+            label={selectedOrder ? "peças · OP 0148" : "peças produzidas"}
+          />
+          <MetricCard
+            value={selectedOrder ? String(selectedOrder.pendingPackages) : "—"}
+            label="pacotes a validar"
+          />
         </View>
-        <Pressable onPress={() => router.push("/(tabs)/ordens")} style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 18, flexDirection: "row", alignItems: "center", gap: 14, borderWidth: 1, borderColor: "#CBD5E1" }}>
-          <View style={{ width: 46, height: 46, borderRadius: 12, backgroundColor: colors.primary[50], alignItems: "center", justifyContent: "center" }}><ClipboardList size={25} color={colors.navy[600]} /></View>
-          <View style={{ flex: 1 }}><Text style={{ color: colors.text.primary, fontSize: 17, fontWeight: "700" }}>Ver ordens de produção</Text><Text style={{ color: colors.text.secondary, marginTop: 3 }}>Consulte todas as ordens disponíveis</Text></View>
-          <Text style={{ color: colors.navy[600], fontSize: 24 }}>›</Text>
-        </Pressable>
+
+        <ActionButton
+          title="Validar pacotes"
+          secondary
+          onPress={() => router.push("/(tabs)/bipagem")}
+        />
+
+        <Text style={styles.demoNotice}>
+          Demonstração · Dados e conexões simulados
+        </Text>
       </ScrollView>
 
-      <Modal visible={scannerOpen} animationType="fade" onRequestClose={() => setScannerOpen(false)}>
-        <View style={{ flex: 1, backgroundColor: "#07111F" }}>
-          <CameraView
-            style={{ flex: 1 }}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={scanned ? undefined : ({ data }) => { setScanned(true); openOrder(data); }}
-          />
-          <View pointerEvents="none" style={{ position: "absolute", left: 35, right: 35, top: "28%", height: 280, borderWidth: 3, borderColor: colors.primary[500], borderRadius: 24 }} />
-          <Pressable onPress={() => setScannerOpen(false)} style={{ position: "absolute", top: 54, right: 24, width: 46, height: 46, borderRadius: 23, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" }}><X size={27} color="white" /></Pressable>
-          <View style={{ position: "absolute", left: 24, right: 24, bottom: 54, backgroundColor: "rgba(7,17,31,0.82)", borderRadius: 16, padding: 18 }}><Text style={{ color: "white", textAlign: "center", fontSize: 18, fontWeight: "800" }}>Aponte para o QR Code da OP</Text><Text style={{ color: "#CBD5E1", textAlign: "center", marginTop: 6 }}>Após a leitura, a ordem será aberta automaticamente.</Text></View>
+      <Modal
+        visible={searchOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSearchOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Consultar OP</Text>
+              <Pressable onPress={() => setSearchOpen(false)}>
+                <X color={theme.ink} size={24} />
+              </Pressable>
+            </View>
+            <Text style={styles.modalDescription}>
+              Digite o número de uma ordem para abrir a tela de detalhes em
+              modo de demonstração.
+            </Text>
+            <TextInput
+              value={orderNumber}
+              onChangeText={setOrderNumber}
+              placeholder="Ex.: 10245"
+              placeholderTextColor={theme.muted}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              style={styles.searchInput}
+              onSubmitEditing={() => openOrderDetails(orderNumber)}
+            />
+            <Pressable
+              style={styles.modalPrimary}
+              onPress={() => openOrderDetails(orderNumber)}
+            >
+              <Search color={theme.white} size={19} />
+              <Text style={styles.primaryText}>Abrir OP (teste)</Text>
+            </Pressable>
+            <Pressable
+              style={styles.modalSecondary}
+              onPress={() => {
+                setSearchOpen(false);
+                router.push("/(tabs)/ordens");
+              }}
+            >
+              <Text style={styles.secondaryText}>Ver todas as ordens</Text>
+            </Pressable>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
+  header: { paddingHorizontal: 24, paddingVertical: 24, gap: 4 },
+  brand: { fontSize: 12, lineHeight: 20, fontWeight: "500", color: theme.teal },
+  pageTitle: { fontSize: 28, lineHeight: 36, fontWeight: "700", color: theme.ink },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 24, paddingBottom: 24, gap: 16 },
+  greeting: { fontSize: 28, lineHeight: 36, fontWeight: "700", color: theme.ink },
+  connectionStatus: {
+    backgroundColor: theme.successBg, borderRadius: 12, padding: 8,
+    minHeight: 36, justifyContent: "center",
+  },
+  connectionText: { fontSize: 12, lineHeight: 20, fontWeight: "500", color: theme.success },
+  actionButton: {
+    height: 56, borderRadius: 12, alignItems: "center", justifyContent: "center",
+  },
+  primaryButton: { backgroundColor: theme.navy },
+  secondaryButton: { backgroundColor: theme.white },
+  actionText: { fontSize: 16, lineHeight: 24, fontWeight: "600" },
+  primaryText: { color: theme.white, fontSize: 16, fontWeight: "600" },
+  secondaryText: { color: theme.navy, fontSize: 16, fontWeight: "600" },
+  pressed: { opacity: 0.75 },
+  sectionTitle: { fontSize: 20, lineHeight: 28, fontWeight: "600", color: theme.ink },
+  orderCard: {
+    backgroundColor: theme.white, borderWidth: 1, borderColor: theme.border,
+    borderRadius: 12, padding: 16, gap: 8,
+  },
+  orderTitle: { fontSize: 20, lineHeight: 28, fontWeight: "600", color: theme.ink },
+  orderDescription: { fontSize: 16, lineHeight: 24, color: theme.muted },
+  orderStatus: { fontSize: 16, lineHeight: 24, fontWeight: "600", color: theme.ink },
+  orderHint: { fontSize: 16, lineHeight: 24, color: theme.ink },
+  metricsContainer: { flexDirection: "row", gap: 16 },
+  metricCard: {
+    flex: 1, minWidth: 0, minHeight: 110, backgroundColor: theme.white,
+    borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 16, gap: 8,
+  },
+  metricValue: { fontSize: 40, lineHeight: 48, fontWeight: "700", color: theme.ink },
+  metricLabel: { fontSize: 12, lineHeight: 20, fontWeight: "500", color: theme.muted },
+  demoNotice: {
+    fontSize: 12, lineHeight: 20, color: theme.muted, textAlign: "center",
+  },
+  modalOverlay: {
+    flex: 1, backgroundColor: "rgba(7,17,31,0.65)",
+    justifyContent: "center", padding: 24,
+  },
+  modalCard: { backgroundColor: theme.white, borderRadius: 18, padding: 20, gap: 16 },
+  modalHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+  },
+  modalTitle: { color: theme.ink, fontSize: 20, fontWeight: "700" },
+  modalDescription: { color: theme.muted, fontSize: 14, lineHeight: 21 },
+  searchInput: {
+    height: 54, borderWidth: 1, borderColor: theme.border,
+    borderRadius: 12, paddingHorizontal: 16, fontSize: 16,
+    color: theme.ink, backgroundColor: theme.background,
+  },
+  modalPrimary: {
+    minHeight: 54, borderRadius: 12, backgroundColor: theme.navy,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+  },
+  modalSecondary: {
+    minHeight: 54, borderRadius: 12, backgroundColor: theme.white,
+    borderWidth: 1, borderColor: theme.border, alignItems: "center", justifyContent: "center",
+  },
+});
