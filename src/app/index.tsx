@@ -1,53 +1,193 @@
 
 import { Boxes } from "lucide-react-native";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+
 import {
   Alert,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TextField } from "@/components/forms/TextField";
 import { Button } from "@/components/ui/Button";
 import { colors } from "@/theme/colors";
 
-// Credenciais temporárias para desenvolvimento
-const TEST_USER = "operador";
-const TEST_PASSWORD = "Teste@123";
+// API do PRODSYNC ERP
+const API_URL = (
+  process.env.EXPO_PUBLIC_API_URL ?? ""
+).replace(/\/+$/, "");
+
+// Chaves utilizadas no armazenamento seguro
+const TOKEN_KEY = "prodsync_access_token";
+const USER_KEY = "prodsync_authenticated_user";
+
+// Estrutura da resposta enviada pelo NestJS
+type UsuarioAutenticado = {
+  id: string;
+  nome: string;
+  email: string;
+  perfil: "ADMIN" | "SUPERVISOR" | "OPERADOR";
+};
+
+type LoginResponse = {
+  accessToken: string;
+  tokenType: string;
+  usuario: UsuarioAutenticado;
+};
 
 export default function LoginScreen() {
   const router = useRouter();
 
-  const [username, setUsername] = useState("");
+  // Campos do formulário
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const passwordIsValid = password.length >= 8;
+  // Controle do carregamento
+  const [loading, setLoading] = useState(false);
+
+  // Evita múltiplas requisições simultâneas
+  const submitting = useRef(false);
+
+  // Validação inicial
+  const emailIsValid =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   const formIsValid =
-    username.trim().length > 0 && passwordIsValid;
+    emailIsValid &&
+    password.length > 0 &&
+    !loading;
 
-  function handleLogin() {
-    const validUser =
-      username.trim() === TEST_USER;
+  // Login real pelo ERP
+  async function handleLogin() {
+    if (submitting.current) {
+      return;
+    }
 
-    const validPassword =
-      password === TEST_PASSWORD;
-
-    if (!validUser || !validPassword) {
+    if (!emailIsValid || !password) {
       Alert.alert(
-        "Erro no login",
-        "Usuário ou senha incorretos."
+        "Dados inválidos",
+        "Informe um e-mail válido e sua senha."
       );
       return;
     }
 
-    // Abre a Home e retira o login do histórico
-    router.replace("/(tabs)");
+    if (!API_URL) {
+      Alert.alert(
+        "API não configurada",
+        "Configure EXPO_PUBLIC_API_URL no arquivo .env do projeto."
+      );
+      return;
+    }
+
+    submitting.current = true;
+    setLoading(true);
+
+    const controller = new AbortController();
+
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 15000);
+
+    try {
+      // Solicita autenticação ao NestJS
+      const response = await fetch(
+        `${API_URL}/auth/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            senha: password,
+          }),
+          signal: controller.signal,
+        }
+      );
+
+      if (response.status === 401) {
+        Alert.alert(
+          "Acesso negado",
+          "E-mail ou senha incorretos, ou usuário desativado."
+        );
+        return;
+      }
+
+      if (!response.ok) {
+        Alert.alert(
+          "Erro no servidor",
+          "Não foi possível realizar o login. Tente novamente."
+        );
+        return;
+      }
+
+      const data: LoginResponse =
+        await response.json();
+
+      // Verifica o formato da resposta
+      if (
+        !data.accessToken ||
+        !data.usuario?.id ||
+        !data.usuario?.perfil
+      ) {
+        throw new Error(
+          "Resposta de autenticação inválida."
+        );
+      }
+
+      // Salva a sessão de forma segura
+      await SecureStore.setItemAsync(
+        TOKEN_KEY,
+        data.accessToken
+      );
+
+      await SecureStore.setItemAsync(
+        USER_KEY,
+        JSON.stringify(data.usuario)
+      );
+
+      // Remove a senha da tela
+      setPassword("");
+
+      // Abre a Home do PRODSYNC
+      router.replace("/(tabs)");
+
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.name === "AbortError"
+      ) {
+        Alert.alert(
+          "Tempo esgotado",
+          "A API demorou para responder. Verifique a rede e tente novamente."
+        );
+      } else {
+        Alert.alert(
+          "Erro de conexão",
+          "Não foi possível conectar ao PRODSYNC ERP. Verifique o endereço da API, o Wi-Fi e se o servidor NestJS está ligado."
+        );
+
+        console.error(
+          "Falha na autenticação:",
+          error instanceof Error
+            ? error.message
+            : "Erro desconhecido"
+        );
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      submitting.current = false;
+      setLoading(false);
+    }
   }
 
   return (
@@ -59,15 +199,23 @@ export default function LoginScreen() {
     >
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={
+          Platform.OS === "ios"
+            ? "padding"
+            : undefined
+        }
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+          }}
         >
           <View className="w-full max-w-[440px] flex-1 self-center bg-navy-700">
 
+            {/* IDENTIDADE VISUAL */}
             <View className="min-h-[380px] flex-1 items-center justify-center px-6 py-12">
+
               <View className="h-16 w-16 items-center justify-center rounded-2xl bg-white/15">
                 <Boxes
                   size={34}
@@ -93,6 +241,7 @@ export default function LoginScreen() {
               </View>
             </View>
 
+            {/* FORMULÁRIO */}
             <View className="rounded-t-[28px] bg-background px-6 pb-8 pt-7">
 
               <Text className="text-xl font-bold text-slate-950">
@@ -100,20 +249,29 @@ export default function LoginScreen() {
               </Text>
 
               <Text className="mt-1 text-sm text-slate-500">
-                Use suas credenciais para acessar a produção.
+                Utilize as credenciais cadastradas no PRODSYNC ERP.
               </Text>
 
               <View className="mt-7 gap-5">
 
+                {/* EMAIL */}
                 <TextField
-                  label="Usuário"
-                  placeholder="Digite seu usuário"
+                  label="E-mail"
+                  placeholder="Digite seu e-mail"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  value={username}
-                  onChangeText={setUsername}
+                  keyboardType="email-address"
+                  value={email}
+                  onChangeText={setEmail}
+                  error={
+                    email.length > 0 &&
+                    !emailIsValid
+                      ? "Informe um e-mail válido."
+                      : undefined
+                  }
                 />
 
+                {/* SENHA */}
                 <TextField
                   label="Senha"
                   placeholder="Digite sua senha"
@@ -122,37 +280,60 @@ export default function LoginScreen() {
                   autoCorrect={false}
                   value={password}
                   onChangeText={setPassword}
-                  error={
-                    password.length > 0 && !passwordIsValid
-                      ? "A senha deve possuir pelo menos 8 caracteres."
-                      : undefined
-                  }
                 />
 
+                {/* BOTÃO DE LOGIN */}
                 <Button
-                  title="Entrar"
+                  title={
+                    loading
+                      ? "Autenticando..."
+                      : "Entrar"
+                  }
                   disabled={!formIsValid}
-                  onPress={handleLogin}
+                  onPress={() => {
+                    void handleLogin();
+                  }}
                 />
+
+                {loading && (
+                  <View className="flex-row items-center justify-center gap-2">
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.primary[600]}
+                    />
+
+                    <Text className="text-sm text-slate-500">
+                      Verificando suas credenciais...
+                    </Text>
+                  </View>
+                )}
+
               </View>
 
+              {/* INFORMAÇÕES */}
               <View className="mt-7 items-center">
+
                 <Text className="text-xs text-slate-400">
-                  Ambiente de desenvolvimento
+                  Autenticação integrada ao PRODSYNC ERP
                 </Text>
 
                 <Text className="mt-1 text-xs font-semibold text-primary-600">
                   Suporte: TI — ramal 3321
                 </Text>
+
               </View>
 
+              {/* AVISO DE SEGURANÇA */}
               <View className="mt-6 rounded-2xl border border-primary-100 bg-primary-50 px-4 py-3">
+
                 <Text className="text-center text-xs text-primary-600">
-                  Acesso restrito aos operadores autorizados
+                  Acesso restrito aos usuários autorizados
                 </Text>
+
               </View>
 
             </View>
+
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

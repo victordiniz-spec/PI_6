@@ -1,15 +1,54 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# ==========================================
+# PRODSYNC - GITIGNORE
+# Mobile Expo + Web React + API NestJS
+# ==========================================
+
+# ------------------------------------------
+# Dependencias Node.js
+# ------------------------------------------
 node_modules/
+**/node_modules/
 
-# Expo
+# ------------------------------------------
+# Variaveis de ambiente e credenciais
+# ------------------------------------------
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Permitir arquivos de exemplo sem senhas
+!.env.example
+!**/.env.example
+
+# ------------------------------------------
+# Expo / React Native
+# ------------------------------------------
 .expo/
-dist/
+**/.expo/
+
 web-build/
 expo-env.d.ts
 
-# Native
+# ------------------------------------------
+# Builds gerados
+# ------------------------------------------
+dist/
+**/dist/
+
+build/
+**/build/
+
+coverage/
+**/coverage/
+
+.vite/
+**/.vite/
+
+# ------------------------------------------
+# Arquivos nativos Android / iOS
+# ------------------------------------------
 .kotlin/
 *.orig.*
 *.jks
@@ -18,26 +57,85 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
-# Metro
+/ios/
+/android/
+
+# ------------------------------------------
+# Metro Bundler
+# ------------------------------------------
 .metro-health-check*
 
-# debug
+# ------------------------------------------
+# Logs e arquivos temporarios
+# ------------------------------------------
+*.log
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+pnpm-debug.*
 
-# macOS
+tmp/
+temp/
+.cache/
+**/.cache/
+
+# ------------------------------------------
+# Sistema operacional
+# ------------------------------------------
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# ------------------------------------------
+# Certificados e chaves privadas
+# ------------------------------------------
 *.pem
 
-# local env files
-.env*.local
-
-# typescript
+# ------------------------------------------
+# TypeScript
+# ------------------------------------------
 *.tsbuildinfo
 
-example
+# ------------------------------------------
+# Prisma
+# ------------------------------------------
+# Ignorar o Prisma Client gerado
+api/src/generated/
+api/generated/
 
-# generated native folders
-/ios
-/android
+# IMPORTANTE:
+# Nao ignorar:
+# api/prisma/schema.prisma
+# api/prisma/migrations/
+# api/prisma.config.ts
+
+# ------------------------------------------
+# PostgreSQL / Docker
+# ------------------------------------------
+# Backups locais do banco
+*.sql.gz
+*.dump
+*.backup
+
+# Dados locais, caso sejam usados bind mounts
+postgres_data/
+pgdata/
+db_data/
+
+# IMPORTANTE:
+# docker-compose.yml deve ser versionado
+# para que toda a equipe utilize o mesmo ambiente.
+
+# ------------------------------------------
+# Arquivos de editores
+# ------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+
+.idea/
+
+# ------------------------------------------
+# Outros arquivos locais
+# ------------------------------------------
+*.swp
+*.swo

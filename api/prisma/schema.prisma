@@ -1,0 +1,45 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PerfilUsuario {
+  ADMIN
+  SUPERVISOR
+  OPERADOR
+}
+
+model Usuario {
+  id           String        @id @default(uuid())
+  nome         String
+  email        String        @unique
+  senhaHash    String
+  perfil       PerfilUsuario @default(OPERADOR)
+  ativo        Boolean       @default(true)
+
+  criadoEm     DateTime      @default(now())
+  atualizadoEm DateTime      @updatedAt
+
+  @@map("usuarios")
+}
+
+model Produto {
+  id           String   @id @default(uuid())
+  codigo       String   @unique
+  descricao    String
+  cor          String?
+  acabamento   String?
+  larguraMm    Int?
+  espessuraMm  Int?
+  unidade      String   @default("UN")
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@map("produtos")
+}
