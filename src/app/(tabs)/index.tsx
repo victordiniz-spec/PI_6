@@ -1,19 +1,29 @@
 
-import { useRouter, useFocusEffect, type Href } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import {
+  useRouter,
+  useFocusEffect,
+  type Href,
+} from "expo-router";
+
 import * as SecureStore from "expo-secure-store";
 
 import {
   LogOut,
   Search,
   X,
+  RefreshCw,
+  ClipboardList,
+  AlertCircle,
+  LockKeyhole,
 } from "lucide-react-native";
-
-import { useCallback, useState } from "react";
 
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,8 +34,15 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  ordensProducaoApi,
+  ErroAPI,
+  type OrdemProducao,
+  type SituacaoOP,
+} from "@/services/ordensProducao";
+
 // =====================================
-// PRODSYNC - CORES DO FIGMA
+// PRODSYNC - IDENTIDADE VISUAL
 // =====================================
 
 const theme = {
@@ -38,30 +55,14 @@ const theme = {
   border: "#DCE5EB",
   success: "#167046",
   successBg: "#E6F5EC",
+  warning: "#B45309",
+  danger: "#B42318",
 };
 
 // =====================================
-// CONFIGURACAO DE DEMONSTRACAO
+// AUTENTICAÇÃO
 // =====================================
 
-// Ainda nao estamos buscando OPs pela API.
-const DEMO_MODE = true;
-
-const demoOrder = {
-  number: "2026-0148",
-  product: "Forro PVC branco",
-  code: "PVC-001",
-  status: "Em produção",
-  quantity: 600,
-  pendingPackages: 6,
-};
-
-// =====================================
-// SESSAO DO USUARIO
-// =====================================
-
-// Devem ser iguais as chaves usadas
-// no login principal do aplicativo.
 const TOKEN_KEY = "prodsync_access_token";
 const USER_KEY = "prodsync_authenticated_user";
 
@@ -73,29 +74,68 @@ type UsuarioAutenticado = {
 };
 
 // =====================================
-// COMPONENTES REUTILIZAVEIS
+// FORMATADORES
+// =====================================
+
+function formatarNumero(valor: number) {
+  return valor.toLocaleString("pt-BR");
+}
+
+function nomeSituacao(situacao: SituacaoOP) {
+  const nomes: Record<SituacaoOP, string> = {
+    PENDENTE: "Pendente",
+    EM_PRODUCAO: "Em produção",
+    PAUSADA: "Pausada",
+    FINALIZADA: "Finalizada",
+    CANCELADA: "Cancelada",
+  };
+
+  return nomes[situacao] ?? situacao;
+}
+
+function corSituacao(situacao: SituacaoOP) {
+  switch (situacao) {
+    case "EM_PRODUCAO":
+      return theme.success;
+    case "FINALIZADA":
+      return "#166534";
+    case "PAUSADA":
+      return theme.warning;
+    case "CANCELADA":
+      return theme.danger;
+    default:
+      return theme.teal;
+  }
+}
+
+// =====================================
+// BOTÃO PRINCIPAL
 // =====================================
 
 type ActionButtonProps = {
   title: string;
   secondary?: boolean;
+  disabled?: boolean;
   onPress: () => void;
 };
 
 function ActionButton({
   title,
   secondary = false,
+  disabled = false,
   onPress,
 }: ActionButtonProps) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
       style={({ pressed }) => [
         styles.actionButton,
         secondary
           ? styles.secondaryButton
           : styles.primaryButton,
+        disabled && styles.disabled,
         pressed && styles.pressed,
       ]}
     >
@@ -113,15 +153,17 @@ function ActionButton({
   );
 }
 
-type MetricCardProps = {
-  value: string;
-  label: string;
-};
+// =====================================
+// INDICADORES
+// =====================================
 
 function MetricCard({
   value,
   label,
-}: MetricCardProps) {
+}: {
+  value: string;
+  label: string;
+}) {
   return (
     <View style={styles.metricCard}>
       <Text
@@ -140,46 +182,63 @@ function MetricCard({
 }
 
 // =====================================
-// TELA HOME
+// HOME
 // =====================================
 
 export default function HomeScreen() {
   const router = useRouter();
 
-  // Usuario conectado
   const [usuario, setUsuario] =
     useState<UsuarioAutenticado | null>(null);
 
   const [checkingSession, setCheckingSession] =
     useState(true);
 
-  // Consulta de OP
+  const [orders, setOrders] =
+    useState<OrdemProducao[]>([]);
+
+  const [loadingOrders, setLoadingOrders] =
+    useState(true);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [apiError, setApiError] = useState("");
+  const [sessionExpired, setSessionExpired] =
+    useState(false);
+
   const [searchOpen, setSearchOpen] =
     useState(false);
 
   const [orderNumber, setOrderNumber] =
     useState("");
 
-  // Dados demonstrativos
-  const selectedOrder = DEMO_MODE
-    ? demoOrder
-    : null;
+  const [searchError, setSearchError] =
+    useState("");
+
+  const [selectedOrderNumber, setSelectedOrderNumber] =
+    useState<string | null>(null);
 
   // =====================================
-  // VERIFICAR SESSAO
+  // VERIFICAR USUÁRIO E CARREGAR OPS
   // =====================================
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
 
-      async function verificarSessao() {
-        try {
-          const token =
-            await SecureStore.getItemAsync(TOKEN_KEY);
+      async function carregarHome() {
+        setCheckingSession(true);
+        setLoadingOrders(true);
+        setApiError("");
+        setSessionExpired(false);
 
-          const usuarioSalvo =
-            await SecureStore.getItemAsync(USER_KEY);
+        try {
+          const [token, usuarioSalvo] =
+            await Promise.all([
+              SecureStore.getItemAsync(TOKEN_KEY),
+              SecureStore.getItemAsync(USER_KEY),
+            ]);
 
           if (!active) return;
 
@@ -200,11 +259,39 @@ export default function HomeScreen() {
             !dados.perfil
           ) {
             throw new Error(
-              "Dados de sessão inválidos"
+              "Dados de sessão inválidos."
             );
           }
 
           setUsuario(dados);
+          setCheckingSession(false);
+
+          try {
+            const lista =
+              await ordensProducaoApi.listar();
+
+            if (!active) return;
+
+            setOrders(lista);
+            setApiError("");
+          } catch (error) {
+            if (!active) return;
+
+            setOrders([]);
+
+            setApiError(
+              error instanceof Error
+                ? error.message
+                : "Não foi possível consultar as OPs."
+            );
+
+            if (
+              error instanceof ErroAPI &&
+              error.status === 401
+            ) {
+              setSessionExpired(true);
+            }
+          }
         } catch {
           if (!active) return;
 
@@ -213,12 +300,12 @@ export default function HomeScreen() {
         } finally {
           if (active) {
             setCheckingSession(false);
+            setLoadingOrders(false);
           }
         }
       }
 
-      setCheckingSession(true);
-      void verificarSessao();
+      void carregarHome();
 
       return () => {
         active = false;
@@ -227,26 +314,140 @@ export default function HomeScreen() {
   );
 
   // =====================================
-  // ENCERRAR SESSAO
+  // ATUALIZAR DADOS DA API
+  // =====================================
+
+  async function atualizarOrdens() {
+    if (refreshing) return;
+
+    setRefreshing(true);
+    setApiError("");
+
+    try {
+      const lista =
+        await ordensProducaoApi.listar();
+
+      setOrders(lista);
+      setSessionExpired(false);
+    } catch (error) {
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível atualizar as OPs."
+      );
+
+      if (
+        error instanceof ErroAPI &&
+        error.status === 401
+      ) {
+        setSessionExpired(true);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  // =====================================
+  // INDICADORES REAIS
+  // =====================================
+
+  const indicadores = useMemo(() => {
+    const total = orders.length;
+
+    const pendentes = orders.filter(
+      (op) => op.situacao === "PENDENTE"
+    ).length;
+
+    const emProducao = orders.filter(
+      (op) => op.situacao === "EM_PRODUCAO"
+    ).length;
+
+    const planejado = orders.reduce(
+      (soma, op) =>
+        soma + op.quantidadePlanejada,
+      0
+    );
+
+    const produzido = orders.reduce(
+      (soma, op) =>
+        soma + op.quantidadeProduzida,
+      0
+    );
+
+    return {
+      total,
+      pendentes,
+      emProducao,
+      planejado,
+      produzido,
+    };
+  }, [orders]);
+
+  // =====================================
+  // ORDEM EM DESTAQUE
+  // =====================================
+
+  const selectedOrder = useMemo(() => {
+    if (selectedOrderNumber) {
+      const encontrada = orders.find(
+        (op) =>
+          op.numero === selectedOrderNumber
+      );
+
+      if (encontrada) {
+        return encontrada;
+      }
+    }
+
+    // Apenas destaque visual.
+    // Não representa vínculo com máquina.
+    return (
+      orders.find(
+        (op) => op.situacao === "EM_PRODUCAO"
+      ) ??
+      orders.find(
+        (op) => op.situacao === "PENDENTE"
+      ) ??
+      orders[0] ??
+      null
+    );
+  }, [orders, selectedOrderNumber]);
+
+  const progressoSelecionado =
+    selectedOrder &&
+    selectedOrder.quantidadePlanejada > 0
+      ? Math.min(
+          100,
+          Math.max(
+            0,
+            Math.round(
+              (selectedOrder.quantidadeProduzida /
+                selectedOrder.quantidadePlanejada) *
+                100
+            )
+          )
+        )
+      : 0;
+
+  // =====================================
+  // LOGOUT
   // =====================================
 
   async function handleLogout() {
     try {
-      await SecureStore.deleteItemAsync(
-        TOKEN_KEY
-      );
-
-      await SecureStore.deleteItemAsync(
-        USER_KEY
-      );
+      await Promise.all([
+        SecureStore.deleteItemAsync(TOKEN_KEY),
+        SecureStore.deleteItemAsync(USER_KEY),
+      ]);
 
       setUsuario(null);
+      setOrders([]);
 
       router.replace("/");
     } catch {
       Alert.alert(
         "Erro ao sair",
-        "Não foi possível encerrar a sessão. Tente novamente."
+        "Não foi possível encerrar a sessão."
       );
     }
   }
@@ -272,42 +473,71 @@ export default function HomeScreen() {
   }
 
   // =====================================
-  // NAVEGACAO PARA AS OPs
+  // NAVEGAÇÃO
   // =====================================
 
-  function openOrderDetails(value: string) {
-    const id = value.trim();
+  function abrirDetalhesOP(numero: string) {
+    router.push({
+      pathname: "/ordem/[id]",
+      params: { id: numero },
+    });
+  }
 
-    if (!/^[A-Za-z0-9-]{1,40}$/.test(id)) {
-      Alert.alert(
-        "Número inválido",
-        "Digite uma OP com letras, números ou hífen."
+  function consultarOP() {
+    const numero = orderNumber
+      .trim()
+      .toUpperCase();
+
+    if (!numero) {
+      setSearchError(
+        "Informe o número da OP."
       );
       return;
     }
 
-    setSearchOpen(false);
-    setOrderNumber("");
-
-    router.push(
-      `/ordem/${encodeURIComponent(id)}` as Href
+    const encontrada = orders.find(
+      (op) =>
+        op.numero.toUpperCase() === numero
     );
+
+    if (!encontrada) {
+      setSearchError(
+        "OP não encontrada entre as ordens disponíveis."
+      );
+      return;
+    }
+
+    setSelectedOrderNumber(
+      encontrada.numero
+    );
+
+    setOrderNumber("");
+    setSearchError("");
+    setSearchOpen(false);
+
+    abrirDetalhesOP(encontrada.numero);
   }
 
-  function handleConsultarOP() {
+  function abrirConsulta() {
+    setOrderNumber("");
+    setSearchError("");
     setSearchOpen(true);
   }
 
   function handleLerCodigo() {
+    // Mantém a navegação existente.
     router.push("/(tabs)/bipagem");
   }
 
   function handleValidarPacotes() {
-    router.push("/(tabs)/bipagem");
+    Alert.alert(
+      "Validação ainda não disponível",
+      "A consulta das OPs já utiliza dados reais. A validação de pacotes será liberada quando implementarmos o cadastro de etiquetas, a bipagem segura e o vínculo entre tablet e máquina."
+    );
   }
 
   // =====================================
-  // CARREGAMENTO DA SESSAO
+  // CARREGAMENTO DA SESSÃO
   // =====================================
 
   if (checkingSession || !usuario) {
@@ -339,7 +569,7 @@ export default function HomeScreen() {
       edges={["top"]}
       style={styles.container}
     >
-      {/* CABECALHO */}
+      {/* CABEÇALHO */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
@@ -352,17 +582,43 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          <Pressable
-            onPress={confirmarSaida}
-            accessibilityRole="button"
-            accessibilityLabel="Sair da conta"
-            style={styles.logoutButton}
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 10,
+            }}
           >
-            <LogOut
-              size={21}
-              color={theme.navy}
-            />
-          </Pressable>
+            <Pressable
+              onPress={() =>
+                void atualizarOrdens()
+              }
+              disabled={refreshing}
+              accessibilityLabel="Atualizar dados"
+              style={styles.iconButton}
+            >
+              {refreshing ? (
+                <ActivityIndicator
+                  color={theme.teal}
+                />
+              ) : (
+                <RefreshCw
+                  size={21}
+                  color={theme.navy}
+                />
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={confirmarSaida}
+              accessibilityLabel="Sair da conta"
+              style={styles.iconButton}
+            >
+              <LogOut
+                size={21}
+                color={theme.navy}
+              />
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -376,7 +632,7 @@ export default function HomeScreen() {
           Olá, {primeiroNome}.
         </Text>
 
-        {/* IDENTIFICACAO DO OPERADOR */}
+        {/* OPERADOR AUTENTICADO */}
         <View style={styles.userCard}>
           <View style={styles.userAvatar}>
             <Text style={styles.userInitial}>
@@ -407,18 +663,50 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* STATUS DO ERP */}
+        {/* STATUS DA CONSULTA */}
         <View style={styles.connectionStatus}>
           <Text style={styles.connectionText}>
-            Sessão identificada ·
-            Ordens em modo de demonstração
+            {loadingOrders
+              ? "Consultando ordens no Mini ERP..."
+              : apiError
+                ? "Não foi possível atualizar os dados."
+                : "Ordens consultadas no Mini ERP."}
           </Text>
         </View>
 
-        {/* ACOES PRINCIPAIS */}
+        {/* MENSAGENS DE ERRO */}
+        {!!apiError && (
+          <View style={styles.errorCard}>
+            <AlertCircle
+              size={20}
+              color={theme.danger}
+            />
+
+            <View style={{ flex: 1, gap: 10 }}>
+              <Text style={styles.errorText}>
+                {apiError}
+              </Text>
+
+              {sessionExpired && (
+                <Pressable
+                  onPress={() =>
+                    router.replace("/")
+                  }
+                  style={styles.errorButton}
+                >
+                  <Text style={styles.errorButtonText}>
+                    Fazer login novamente
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* AÇÕES PRINCIPAIS */}
         <ActionButton
           title="Consultar OP"
-          onPress={handleConsultarOP}
+          onPress={abrirConsulta}
         />
 
         <ActionButton
@@ -427,89 +715,219 @@ export default function HomeScreen() {
           onPress={handleLerCodigo}
         />
 
-        {/* ORDEM SELECIONADA */}
+        {/* INDICADORES REAIS */}
         <Text style={styles.sectionTitle}>
-          Ordem selecionada
+          Resumo das ordens disponíveis
         </Text>
 
-        {selectedOrder ? (
-          <Pressable
-            style={styles.orderCard}
-            onPress={() =>
-              openOrderDetails(
-                selectedOrder.number
-              )
+        <View style={styles.metricsContainer}>
+          <MetricCard
+            value={
+              loadingOrders
+                ? "..."
+                : formatarNumero(
+                    indicadores.total
+                  )
             }
-          >
+            label="OPs disponíveis"
+          />
+
+          <MetricCard
+            value={
+              loadingOrders
+                ? "..."
+                : formatarNumero(
+                    indicadores.pendentes
+                  )
+            }
+            label="OPs pendentes"
+          />
+        </View>
+
+        <View style={styles.metricsContainer}>
+          <MetricCard
+            value={
+              loadingOrders
+                ? "..."
+                : formatarNumero(
+                    indicadores.emProducao
+                  )
+            }
+            label="OPs em produção"
+          />
+
+          <MetricCard
+            value={
+              loadingOrders
+                ? "..."
+                : formatarNumero(
+                    indicadores.produzido
+                  )
+            }
+            label="Unidades produzidas"
+          />
+        </View>
+
+        {/* ORDEM EM DESTAQUE */}
+        <Text style={styles.sectionTitle}>
+          Ordem em destaque
+        </Text>
+
+        {loadingOrders ? (
+          <View style={styles.orderCard}>
+            <ActivityIndicator
+              color={theme.teal}
+            />
+
+            <Text style={styles.orderDescription}>
+              Carregando ordens reais...
+            </Text>
+          </View>
+        ) : apiError ? (
+          <View style={styles.orderCard}>
             <Text style={styles.orderTitle}>
-              OP {selectedOrder.number}
+              Dados indisponíveis
             </Text>
 
             <Text style={styles.orderDescription}>
-              {selectedOrder.product} ·{" "}
-              {selectedOrder.code}
+              Atualize a Home para consultar
+              novamente o ERP.
             </Text>
+          </View>
+        ) : selectedOrder ? (
+          <Pressable
+            style={styles.orderCard}
+            onPress={() =>
+              abrirDetalhesOP(
+                selectedOrder.numero
+              )
+            }
+          >
+            <View style={styles.orderHeader}>
+              <Text style={styles.orderTitle}>
+                OP {selectedOrder.numero}
+              </Text>
 
-            <Text style={styles.orderStatus}>
-              ● {selectedOrder.status}
+              <Text
+                style={{
+                  color: corSituacao(
+                    selectedOrder.situacao
+                  ),
+                  fontWeight: "700",
+                  fontSize: 12,
+                }}
+              >
+                {nomeSituacao(
+                  selectedOrder.situacao
+                )}
+              </Text>
+            </View>
+
+            <Text style={styles.orderDescription}>
+              {selectedOrder.produto?.descricao ??
+                "Produto não identificado"}
             </Text>
 
             <Text style={styles.orderHint}>
-              Ordem demonstrativa ·
-              Toque para visualizar
+              Código:{" "}
+              {selectedOrder.produto?.codigo ?? "—"}
+            </Text>
+
+            <View style={styles.orderValues}>
+              <View>
+                <Text style={styles.smallLabel}>
+                  Planejado
+                </Text>
+
+                <Text style={styles.smallValue}>
+                  {formatarNumero(
+                    selectedOrder.quantidadePlanejada
+                  )}
+                </Text>
+              </View>
+
+              <View>
+                <Text style={styles.smallLabel}>
+                  Produzido
+                </Text>
+
+                <Text style={styles.smallValue}>
+                  {formatarNumero(
+                    selectedOrder.quantidadeProduzida
+                  )}
+                </Text>
+              </View>
+
+              <View>
+                <Text style={styles.smallLabel}>
+                  Progresso
+                </Text>
+
+                <Text style={styles.smallValue}>
+                  {progressoSelecionado}%
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.progressBackground}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${progressoSelecionado}%`,
+                  },
+                ]}
+              />
+            </View>
+
+            <Text style={styles.orderHint}>
+              Toque para consultar os detalhes
             </Text>
           </Pressable>
         ) : (
           <View style={styles.orderCard}>
+            <ClipboardList
+              size={28}
+              color={theme.muted}
+            />
+
             <Text style={styles.orderTitle}>
-              Nenhuma ordem selecionada
+              Nenhuma ordem disponível
             </Text>
 
             <Text style={styles.orderDescription}>
-              Consulte uma ordem para
-              visualizar os dados de produção.
+              Cadastre uma OP no Mini ERP
+              para visualizá-la aqui.
             </Text>
           </View>
         )}
 
-        {/* INDICADORES */}
-        <View style={styles.metricsContainer}>
-          <MetricCard
-            value={
-              selectedOrder
-                ? String(
-                    selectedOrder.quantity
-                  )
-                : "—"
-            }
-            label="peças · demonstração"
-          />
-
-          <MetricCard
-            value={
-              selectedOrder
-                ? String(
-                    selectedOrder.pendingPackages
-                  )
-                : "—"
-            }
-            label="pacotes a validar"
-          />
-        </View>
-
+        {/* VALIDAÇÃO DE PACOTES */}
         <ActionButton
           title="Validar pacotes"
           secondary
           onPress={handleValidarPacotes}
         />
 
-        <Text style={styles.demoNotice}>
-          Demonstração · Produção e OPs
-          ainda não integradas ao ERP
-        </Text>
+        {/* AVISO DE SEGURANÇA */}
+        <View style={styles.securityCard}>
+          <LockKeyhole
+            size={19}
+            color={theme.teal}
+          />
+
+          <Text style={styles.securityText}>
+            Os indicadores representam as
+            ordens retornadas pelo ERP, não
+            apenas as de uma máquina.
+            A identificação do tablet e
+            o vínculo com a máquina serão
+            implementados no módulo de segurança.
+          </Text>
+        </View>
       </ScrollView>
 
-      {/* MODAL DE CONSULTA DE OP */}
+      {/* MODAL DE CONSULTA */}
       <Modal
         visible={searchOpen}
         transparent
@@ -518,89 +936,105 @@ export default function HomeScreen() {
           setSearchOpen(false)
         }
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                Consultar OP
+        <KeyboardAvoidingView
+          behavior={
+            Platform.OS === "ios"
+              ? "padding"
+              : "height"
+          }
+          style={styles.modalOverlay}
+        >
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={
+              styles.modalScroll
+            }
+          >
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  Consultar OP
+                </Text>
+
+                <Pressable
+                  onPress={() =>
+                    setSearchOpen(false)
+                  }
+                  accessibilityLabel="Fechar consulta"
+                >
+                  <X
+                    color={theme.ink}
+                    size={24}
+                  />
+                </Pressable>
+              </View>
+
+              <Text
+                style={styles.modalDescription}
+              >
+                Digite o número de uma OP
+                cadastrada no Mini ERP para
+                visualizar seus detalhes.
               </Text>
 
-              <Pressable
-                onPress={() =>
-                  setSearchOpen(false)
+              <TextInput
+                value={orderNumber}
+                onChangeText={(texto) => {
+                  setOrderNumber(texto);
+                  setSearchError("");
+                }}
+                placeholder="Ex.: 2026-0148"
+                placeholderTextColor={
+                  theme.muted
                 }
-                accessibilityRole="button"
-                accessibilityLabel="Fechar consulta"
-              >
-                <X
-                  color={theme.ink}
-                  size={24}
-                />
-              </Pressable>
-            </View>
-
-            <Text
-              style={styles.modalDescription}
-            >
-              Digite o número de uma
-              ordem para abrir seus detalhes.
-              A consulta ainda está em modo
-              de demonstração.
-            </Text>
-
-            <TextInput
-              value={orderNumber}
-              onChangeText={setOrderNumber}
-              placeholder="Ex.: 10245"
-              placeholderTextColor={
-                theme.muted
-              }
-              autoCapitalize="characters"
-              autoCorrect={false}
-              style={styles.searchInput}
-              onSubmitEditing={() =>
-                openOrderDetails(orderNumber)
-              }
-            />
-
-            <Pressable
-              style={styles.modalPrimary}
-              onPress={() =>
-                openOrderDetails(orderNumber)
-              }
-              accessibilityRole="button"
-            >
-              <Search
-                color={theme.white}
-                size={19}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="search"
+                style={styles.searchInput}
+                onSubmitEditing={consultarOP}
               />
 
-              <Text
-                style={styles.primaryText}
-              >
-                Abrir OP (teste)
-              </Text>
-            </Pressable>
+              {!!searchError && (
+                <Text style={styles.errorText}>
+                  {searchError}
+                </Text>
+              )}
 
-            <Pressable
-              style={styles.modalSecondary}
-              onPress={() => {
-                setSearchOpen(false);
-
-                router.push(
-                  "/(tabs)/ordens"
-                );
-              }}
-              accessibilityRole="button"
-            >
-              <Text
-                style={styles.secondaryText}
+              <Pressable
+                style={styles.modalPrimary}
+                onPress={consultarOP}
               >
-                Ver todas as ordens
-              </Text>
-            </Pressable>
-          </View>
-        </View>
+                <Search
+                  color={theme.white}
+                  size={19}
+                />
+
+                <Text
+                  style={styles.primaryText}
+                >
+                  Consultar ordem
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.modalSecondary}
+                onPress={() => {
+                  setSearchOpen(false);
+
+                  router.push(
+                    "/(tabs)/ordens" as Href
+                  );
+                }}
+              >
+                <Text
+                  style={styles.secondaryText}
+                >
+                  Ver todas as ordens
+                </Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -658,7 +1092,7 @@ const styles = StyleSheet.create({
     color: theme.ink,
   },
 
-  logoutButton: {
+  iconButton: {
     width: 44,
     height: 44,
     borderRadius: 12,
@@ -675,7 +1109,7 @@ const styles = StyleSheet.create({
 
   content: {
     paddingHorizontal: 24,
-    paddingBottom: 24,
+    paddingBottom: 30,
     gap: 16,
   },
 
@@ -745,7 +1179,6 @@ const styles = StyleSheet.create({
   connectionText: {
     color: theme.success,
     fontSize: 12,
-    fontWeight: "500",
     lineHeight: 19,
   },
 
@@ -762,6 +1195,8 @@ const styles = StyleSheet.create({
 
   secondaryButton: {
     backgroundColor: theme.white,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
 
   actionText: {
@@ -780,6 +1215,10 @@ const styles = StyleSheet.create({
     color: theme.navy,
     fontSize: 16,
     fontWeight: "600",
+  },
+
+  disabled: {
+    opacity: 0.5,
   },
 
   pressed: {
@@ -802,10 +1241,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
+  orderHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
   orderTitle: {
     fontSize: 20,
     lineHeight: 28,
-    fontWeight: "600",
+    fontWeight: "700",
     color: theme.ink,
   },
 
@@ -815,17 +1262,43 @@ const styles = StyleSheet.create({
     color: theme.muted,
   },
 
-  orderStatus: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: "600",
-    color: theme.ink,
+  orderHint: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: theme.muted,
   },
 
-  orderHint: {
-    fontSize: 14,
-    lineHeight: 22,
+  orderValues: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+    gap: 10,
+  },
+
+  smallLabel: {
     color: theme.muted,
+    fontSize: 12,
+  },
+
+  smallValue: {
+    color: theme.ink,
+    fontSize: 19,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+
+  progressBackground: {
+    height: 8,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#E2E8F0",
+    marginTop: 8,
+  },
+
+  progressFill: {
+    height: "100%",
+    backgroundColor: theme.teal,
+    borderRadius: 8,
   },
 
   metricsContainer: {
@@ -846,8 +1319,8 @@ const styles = StyleSheet.create({
   },
 
   metricValue: {
-    fontSize: 40,
-    lineHeight: 48,
+    fontSize: 36,
+    lineHeight: 44,
     fontWeight: "700",
     color: theme.ink,
   },
@@ -859,16 +1332,58 @@ const styles = StyleSheet.create({
     color: theme.muted,
   },
 
-  demoNotice: {
+  securityCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderRadius: 12,
+    backgroundColor: "#E7F2F3",
+    borderWidth: 1,
+    borderColor: "#C8E4E3",
+    padding: 14,
+  },
+
+  securityText: {
+    flex: 1,
+    color: theme.navy,
     fontSize: 12,
-    lineHeight: 20,
-    color: theme.muted,
-    textAlign: "center",
+    lineHeight: 19,
+  },
+
+  errorCard: {
+    backgroundColor: "#FEEDEC",
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  errorText: {
+    color: theme.danger,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  errorButton: {
+    backgroundColor: theme.navy,
+    borderRadius: 9,
+    padding: 10,
+    alignItems: "center",
+  },
+
+  errorButtonText: {
+    color: theme.white,
+    fontWeight: "700",
   },
 
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(7,17,31,0.65)",
+  },
+
+  modalScroll: {
+    flexGrow: 1,
     justifyContent: "center",
     padding: 24,
   },

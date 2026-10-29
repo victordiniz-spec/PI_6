@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -23,15 +22,15 @@ enum PerfilUsuario {
 // ==========================================
 
 model Usuario {
-  id           String        @id @default(uuid())
-  nome         String
-  email        String        @unique
-  senhaHash    String
-  perfil       PerfilUsuario @default(OPERADOR)
-  ativo        Boolean       @default(true)
+  id        String        @id @default(uuid())
+  nome      String
+  email     String        @unique
+  senhaHash String
+  perfil    PerfilUsuario @default(OPERADOR)
+  ativo     Boolean       @default(true)
 
-  criadoEm     DateTime      @default(now())
-  atualizadoEm DateTime      @updatedAt
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 
   @@map("usuarios")
 }
@@ -41,20 +40,20 @@ model Usuario {
 // ==========================================
 
 model Produto {
-  id           String   @id @default(uuid())
-  codigo       String   @unique
-  descricao    String
-  cor          String?
-  acabamento   String?
-  larguraMm    Int?
-  espessuraMm  Int?
-  unidade      String   @default("UN")
-  ativo        Boolean  @default(true)
+  id          String  @id @default(uuid())
+  codigo      String  @unique
+  descricao   String
+  cor         String?
+  acabamento  String?
+  larguraMm   Int?
+  espessuraMm Int?
+  unidade     String  @default("UN")
+  ativo       Boolean @default(true)
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  // Um produto pode participar de várias OPs
+  // Um produto pode participar de varias OPs
   ordensProducao OrdemProducao[]
 
   @@map("produtos")
@@ -77,33 +76,104 @@ enum SituacaoOP {
 // ==========================================
 
 model OrdemProducao {
-  id                  String     @id @default(uuid())
-  numero              String     @unique
+  id     String @id @default(uuid())
+  numero String @unique
 
-  // Produto associado à OP
-  produtoId           String
-  produto             Produto    @relation(fields: [produtoId], references: [id], onDelete: Restrict)
+  // Produto associado a OP
+  produtoId String
+  produto   Produto @relation(fields: [produtoId], references: [id], onDelete: Restrict)
 
   // Quantidades
   quantidadePlanejada Int
-  quantidadeProduzida Int        @default(0)
+  quantidadeProduzida Int @default(0)
 
-  // Situação da produção
-  situacao            SituacaoOP @default(PENDENTE)
+  // Situacao da producao
+  situacao SituacaoOP @default(PENDENTE)
 
-  // Informações adicionais
-  observacoes         String?
-  dataPrevisao        DateTime?
-  iniciadaEm          DateTime?
-  finalizadaEm        DateTime?
+  // Informacoes adicionais
+  observacoes  String?
+  dataPrevisao DateTime?
+  iniciadaEm   DateTime?
+  finalizadaEm DateTime?
 
-  // Auditoria básica
-  criadoEm            DateTime   @default(now())
-  atualizadoEm        DateTime   @updatedAt
+  // Auditoria basica
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 
-  // Índices de consulta
+  // Indices de consulta
   @@index([produtoId])
   @@index([situacao])
-
   @@map("ordens_producao")
+}
+
+// ==========================================
+// SITUAÇÕES DAS MÁQUINAS
+// ==========================================
+
+enum SituacaoMaquina {
+  ATIVA
+  MANUTENCAO
+  INATIVA
+}
+
+// ==========================================
+// SITUAÇÕES DOS TABLETS / CELULARES
+// ==========================================
+
+enum SituacaoTablet {
+  PENDENTE
+  AUTORIZADO
+  BLOQUEADO
+}
+
+// ==========================================
+// MÁQUINAS DE PRODUÇÃO
+// ==========================================
+
+model Maquina {
+  id        String          @id @default(uuid())
+  codigo    String          @unique
+  nome      String
+  descricao String?
+  situacao  SituacaoMaquina @default(ATIVA)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  // Dispositivos vinculados a maquina
+  tablets Tablet[]
+
+  @@map("maquinas")
+}
+
+// ==========================================
+// TABLETS / CELULARES DE PRODUÇÃO
+// ==========================================
+
+model Tablet {
+  id            String         @id @default(uuid())
+  identificador String         @unique
+  nome          String?
+  situacao      SituacaoTablet @default(PENDENTE)
+
+  // Maquina vinculada ao dispositivo
+  maquinaId String?
+  maquina   Maquina? @relation(fields: [maquinaId], references: [id], onDelete: Restrict)
+
+  // Hash da credencial de autenticacao
+  // do dispositivo.
+  // A credencial original nao deve ser
+  // armazenada diretamente no banco.
+  credencialHash String? @unique
+
+  // Registro da autorizacao
+  autorizadoEm DateTime?
+
+  // Auditoria basica
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  // Indice para buscar tablets por maquina
+  @@index([maquinaId])
+  @@map("tablets")
 }

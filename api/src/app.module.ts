@@ -11,6 +11,8 @@ import { UsuariosModule } from "./users/usuarios.module";
 import { ProdutosModule } from "./produtos/produtos.module";
 
 import { OrdensProducaoModule } from "./ordens-producao/ordens-producao.module";
+import { MaquinasModule } from './maquinas/maquinas.module';
+import { TabletsModule } from './tablets/tablets.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { OrdensProducaoModule } from "./ordens-producao/ordens-producao.module";
     UsuariosModule,
     ProdutosModule,
     OrdensProducaoModule,
+    MaquinasModule,
+    TabletsModule,
   ],
   controllers: [
     AppController,
