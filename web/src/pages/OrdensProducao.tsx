@@ -7,6 +7,8 @@ import {
   RefreshCw,
   X,
   Package,
+  Eye,
+  Activity,
 } from "lucide-react";
 
 import {
@@ -93,6 +95,9 @@ export default function OrdensProducao({
   const [ordens, setOrdens] = useState<OrdemProducao[]>([]);
   const [produtos, setProdutos] = useState<ProdutoERP[]>([]);
   const [busca, setBusca] = useState("");
+  const [filtroSituacao, setFiltroSituacao] = useState("TODAS");
+  const [detalheId, setDetalheId] = useState<string | null>(null);
+  const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
@@ -116,6 +121,7 @@ export default function OrdensProducao({
 
       setOrdens(listaOrdens);
       setProdutos(listaProdutos);
+      setAtualizadoEm(new Date());
     } catch (e) {
       setErro(mensagemErro(e));
     } finally {
@@ -127,12 +133,51 @@ export default function OrdensProducao({
     void carregarDados();
   }, [carregarDados]);
 
+  // Atualiza apenas as OPs, sem recarregar os produtos ou apagar a tabela.
+  useEffect(() => {
+    let ativo = true;
+    let emCurso = false;
+    const atualizar = async () => {
+      if (emCurso || document.visibilityState === "hidden") return;
+      emCurso = true;
+      try {
+        const lista = await api.listarOrdens(token);
+        if (ativo) {
+          setOrdens(lista);
+          setAtualizadoEm(new Date());
+        }
+      } catch {
+        // Mantém os últimos dados. Atualização manual exibe erros.
+      } finally {
+        emCurso = false;
+      }
+    };
+    const timer = window.setInterval(() => void atualizar(), 30000);
+    return () => { ativo = false; window.clearInterval(timer); };
+  }, [token]);
+
+  const detalhe = ordens.find((op) => op.id === detalheId) ?? null;
+  const percentual = (op: OrdemProducao) =>
+    op.quantidadePlanejada > 0
+      ? Math.min(100, Math.max(0, (op.quantidadeProduzida / op.quantidadePlanejada) * 100))
+      : 0;
+
+  const statusVisual = (situacao: string) => {
+    switch (situacao) {
+      case "EM_PRODUCAO": return { fundo: "#DEF7F4", texto: "#08766D" };
+      case "FINALIZADA": return { fundo: "#E5F7E9", texto: "#187A3C" };
+      case "PAUSADA": return { fundo: "#FFF3D6", texto: "#946200" };
+      case "CANCELADA": return { fundo: "#FEE8E8", texto: "#AC3030" };
+      default: return { fundo: "#E9EFF5", texto: "#42596D" };
+    }
+  };
+
   const ordensFiltradas = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
-    if (!termo) return ordens;
-
     return ordens.filter((op) =>
+      (filtroSituacao === "TODAS" || op.situacao === filtroSituacao) &&
+      (!termo ||
       [
         op.numero,
         op.produto?.codigo,
@@ -142,9 +187,9 @@ export default function OrdensProducao({
         .filter(Boolean)
         .some((valor) =>
           String(valor).toLowerCase().includes(termo)
-        )
+        ))
     );
-  }, [ordens, busca]);
+  }, [ordens, busca, filtroSituacao]);
 
   const pendentes = ordens.filter(
     (op) => op.situacao === "PENDENTE"
@@ -153,6 +198,9 @@ export default function OrdensProducao({
   const emProducao = ordens.filter(
     (op) => op.situacao === "EM_PRODUCAO"
   ).length;
+
+  const pausadas = ordens.filter((op) => op.situacao === "PAUSADA").length;
+  const finalizadas = ordens.filter((op) => op.situacao === "FINALIZADA").length;
 
   function abrirCadastro() {
     setNumero("");
@@ -269,6 +317,8 @@ export default function OrdensProducao({
           { titulo: "Total de OPs", valor: ordens.length },
           { titulo: "Pendentes", valor: pendentes },
           { titulo: "Em produção", valor: emProducao },
+          { titulo: "Pausadas", valor: pausadas },
+          { titulo: "Finalizadas", valor: finalizadas },
         ].map((item) => (
           <div key={item.titulo} style={cartao}>
             <p style={{ color: cor.cinza, margin: "0 0 10px" }}>
@@ -326,7 +376,23 @@ export default function OrdensProducao({
             />
           </div>
 
+          <select
+            aria-label="Filtrar por situação"
+            value={filtroSituacao}
+            onChange={(e) => setFiltroSituacao(e.target.value)}
+            style={{ ...campo, width: "auto", minWidth: 175 }}
+          >
+            <option value="TODAS">Todas as situações</option>
+            <option value="PENDENTE">Pendentes</option>
+            <option value="EM_PRODUCAO">Em produção</option>
+            <option value="PAUSADA">Pausadas</option>
+            <option value="FINALIZADA">Finalizadas</option>
+            <option value="CANCELADA">Canceladas</option>
+          </select>
           <button
+            type="button"
+            title="Atualizar agora"
+            aria-label="Atualizar agora"
             onClick={() => void carregarDados()}
             style={{
               ...botao,
@@ -338,6 +404,11 @@ export default function OrdensProducao({
           </button>
         </div>
 
+        <p style={{ color: cor.cinza, fontSize: 12, margin: "0 0 14px" }}>
+          <Activity size={14} style={{ verticalAlign: "middle", marginRight: 6 }} />
+          Atualização automática a cada 30 segundos
+          {atualizadoEm ? ` · Última consulta: ${atualizadoEm.toLocaleTimeString("pt-BR")}` : ""}
+        </p>
         {carregando ? (
           <p>Carregando ordens de produção...</p>
         ) : ordensFiltradas.length === 0 ? (
@@ -358,7 +429,7 @@ export default function OrdensProducao({
                 width: "100%",
                 borderCollapse: "collapse",
                 textAlign: "left",
-                minWidth: 680,
+                minWidth: 850,
               }}
             >
               <thead>
@@ -369,6 +440,8 @@ export default function OrdensProducao({
                     "Situação",
                     "Planejado",
                     "Produzido",
+                    "Progresso",
+                    "Detalhes",
                   ].map((titulo) => (
                     <th
                       key={titulo}
@@ -406,10 +479,11 @@ export default function OrdensProducao({
                         style={{
                           padding: "6px 10px",
                           borderRadius: 20,
-                          background: "#E7F2F3",
-                          color: cor.teal,
-                          fontWeight: 600,
+                          background: statusVisual(op.situacao).fundo,
+                          color: statusVisual(op.situacao).texto,
+                          fontWeight: 700,
                           fontSize: 12,
+                          whiteSpace: "nowrap",
                         }}
                       >
                         {situacaoFormatada(op.situacao)}
@@ -423,6 +497,18 @@ export default function OrdensProducao({
                     <td style={{ padding: "15px 10px" }}>
                       {op.quantidadeProduzida}
                     </td>
+                    <td style={{ padding: "15px 10px", minWidth: 130 }}>
+                      <div style={{ height: 8, background: "#E6EDF2", borderRadius: 20, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${percentual(op)}%`, background: cor.teal, borderRadius: 20 }} />
+                      </div>
+                      <small style={{ color: cor.cinza }}>{percentual(op).toFixed(1)}%</small>
+                    </td>
+                    <td style={{ padding: "15px 10px" }}>
+                      <button type="button" onClick={() => setDetalheId(op.id)}
+                        style={{ ...botao, padding: "9px 11px", background: "#E7F2F3", color: cor.navy, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <Eye size={16}/> Ver
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -430,6 +516,39 @@ export default function OrdensProducao({
           </div>
         )}
       </div>
+
+      {detalhe && (
+        <div role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setDetalheId(null); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(7,17,31,.65)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 150 }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="titulo-detalhe-op"
+            style={{ ...cartao, width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <div><p style={{ color: cor.teal, fontWeight: 700, margin: 0 }}>ACOMPANHAMENTO</p>
+                <h2 id="titulo-detalhe-op" style={{ margin: "6px 0" }}>OP {detalhe.numero}</h2></div>
+              <button type="button" aria-label="Fechar detalhes" onClick={() => setDetalheId(null)}
+                style={{ border: 0, background: "transparent", cursor: "pointer" }}><X size={22}/></button>
+            </div>
+            <span style={{ display: "inline-block", marginTop: 12, padding: "6px 10px", borderRadius: 20, fontWeight: 700,
+              background: statusVisual(detalhe.situacao).fundo, color: statusVisual(detalhe.situacao).texto }}>
+              {situacaoFormatada(detalhe.situacao)}
+            </span>
+            <div style={{ marginTop: 20, display: "grid", gap: 12 }}>
+              <div><strong>Produto</strong><div>{detalhe.produto?.descricao ?? "Produto não encontrado"}</div>
+                <small style={{ color: cor.cinza }}>Código: {detalhe.produto?.codigo ?? "—"}</small></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ ...cartao, padding: 14 }}><small>Planejado</small><h3 style={{ margin: "8px 0 0" }}>{detalhe.quantidadePlanejada}</h3></div>
+                <div style={{ ...cartao, padding: 14 }}><small>Produzido</small><h3 style={{ margin: "8px 0 0" }}>{detalhe.quantidadeProduzida}</h3></div>
+              </div>
+              <strong>Progresso: {percentual(detalhe).toFixed(1)}%</strong>
+              <div style={{ height: 12, background: "#E6EDF2", borderRadius: 20, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${percentual(detalhe)}%`, background: cor.teal }} />
+              </div>
+            </div>
+            <button type="button" onClick={() => setDetalheId(null)}
+              style={{ ...botao, marginTop: 24, width: "100%" }}>Fechar</button>
+          </section>
+        </div>
+      )}
 
       {modalAberto && (
         <div

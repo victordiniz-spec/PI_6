@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -32,6 +33,10 @@ model Usuario {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
+  apontamentos      ApontamentoProducao[]
+  paradasIniciadas  ParadaProducao[] @relation("ParadaIniciadaPor")
+  paradasEncerradas ParadaProducao[] @relation("ParadaEncerradaPor")
+
   @@map("usuarios")
 }
 
@@ -53,7 +58,6 @@ model Produto {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  // Um produto pode participar de varias OPs
   ordensProducao OrdemProducao[]
 
   @@map("produtos")
@@ -79,28 +83,25 @@ model OrdemProducao {
   id     String @id @default(uuid())
   numero String @unique
 
-  // Produto associado a OP
   produtoId String
   produto   Produto @relation(fields: [produtoId], references: [id], onDelete: Restrict)
 
-  // Quantidades
   quantidadePlanejada Int
   quantidadeProduzida Int @default(0)
 
-  // Situacao da producao
   situacao SituacaoOP @default(PENDENTE)
 
-  // Informacoes adicionais
   observacoes  String?
   dataPrevisao DateTime?
   iniciadaEm   DateTime?
   finalizadaEm DateTime?
 
-  // Auditoria basica
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  // Indices de consulta
+  apontamentos ApontamentoProducao[]
+  paradas     ParadaProducao[]
+
   @@index([produtoId])
   @@index([situacao])
   @@map("ordens_producao")
@@ -117,7 +118,7 @@ enum SituacaoMaquina {
 }
 
 // ==========================================
-// SITUAÇÕES DOS TABLETS / CELULARES
+// SITUAÇÕES DOS DISPOSITIVOS
 // ==========================================
 
 enum SituacaoTablet {
@@ -127,7 +128,7 @@ enum SituacaoTablet {
 }
 
 // ==========================================
-// MÁQUINAS DE PRODUÇÃO
+// MÁQUINAS
 // ==========================================
 
 model Maquina {
@@ -140,14 +141,15 @@ model Maquina {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  // Dispositivos vinculados a maquina
-  tablets Tablet[]
+  tablets      Tablet[]
+  apontamentos ApontamentoProducao[]
+  paradas      ParadaProducao[]
 
   @@map("maquinas")
 }
 
 // ==========================================
-// TABLETS / CELULARES DE PRODUÇÃO
+// TABLETS / CELULARES
 // ==========================================
 
 model Tablet {
@@ -156,24 +158,81 @@ model Tablet {
   nome          String?
   situacao      SituacaoTablet @default(PENDENTE)
 
-  // Maquina vinculada ao dispositivo
   maquinaId String?
   maquina   Maquina? @relation(fields: [maquinaId], references: [id], onDelete: Restrict)
 
-  // Hash da credencial de autenticacao
-  // do dispositivo.
-  // A credencial original nao deve ser
-  // armazenada diretamente no banco.
   credencialHash String? @unique
+  autorizadoEm   DateTime?
 
-  // Registro da autorizacao
-  autorizadoEm DateTime?
-
-  // Auditoria basica
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  // Indice para buscar tablets por maquina
   @@index([maquinaId])
   @@map("tablets")
+}
+
+// ==========================================
+// APONTAMENTOS DE PRODUÇÃO
+// ==========================================
+
+model ApontamentoProducao {
+  id String @id @default(uuid())
+
+  ordemProducaoId String
+  ordemProducao   OrdemProducao @relation(fields: [ordemProducaoId], references: [id], onDelete: Restrict)
+
+  maquinaId String
+  maquina   Maquina @relation(fields: [maquinaId], references: [id], onDelete: Restrict)
+
+  operadorId String
+  operador   Usuario @relation(fields: [operadorId], references: [id], onDelete: Restrict)
+
+  quantidadeProduzida Int
+  quantidadeRejeitada Int @default(0)
+
+  criadoEm DateTime @default(now())
+
+  @@index([ordemProducaoId])
+  @@index([maquinaId])
+  @@index([operadorId])
+  @@index([criadoEm])
+  @@map("apontamentos_producao")
+}
+
+// ==========================================
+// PARADAS DE PRODUÇÃO
+// ==========================================
+
+model ParadaProducao {
+  id String @id @default(uuid())
+
+  // Máquina relacionada
+  maquinaId String
+  maquina   Maquina @relation(fields: [maquinaId], references: [id], onDelete: Restrict)
+
+  // OP associada (opcional)
+  ordemProducaoId String?
+  ordemProducao   OrdemProducao? @relation(fields: [ordemProducaoId], references: [id], onDelete: Restrict)
+
+  // Motivo e observações
+  motivo                  String
+  observacoes             String?
+  observacoesEncerramento String?
+
+  // Início e encerramento
+  iniciadoEm  DateTime  @default(now())
+  encerradoEm DateTime?
+
+  // Usuário responsável pela abertura
+  iniciadoPorId String
+  iniciadoPor   Usuario @relation("ParadaIniciadaPor", fields: [iniciadoPorId], references: [id], onDelete: Restrict)
+
+  // Usuário responsável pelo encerramento
+  encerradoPorId String?
+  encerradoPor   Usuario? @relation("ParadaEncerradaPor", fields: [encerradoPorId], references: [id], onDelete: Restrict)
+
+  @@index([maquinaId, encerradoEm])
+  @@index([ordemProducaoId])
+  @@index([iniciadoEm])
+  @@map("paradas_producao")
 }

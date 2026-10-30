@@ -1,3 +1,4 @@
+
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
@@ -7,18 +8,22 @@ import { DatabaseController } from "./database.controller";
 
 import { PrismaModule } from "./prisma/prisma.module";
 import { AuthModule } from "./auth/auth.module";
-import { UsuariosModule } from "./users/usuarios.module";
-import { ProdutosModule } from "./produtos/produtos.module";
 
+import { UsuariosModule } from "./usuarios/usuarios.module";
+import { ProdutosModule } from "./produtos/produtos.module";
 import { OrdensProducaoModule } from "./ordens-producao/ordens-producao.module";
-import { MaquinasModule } from './maquinas/maquinas.module';
-import { TabletsModule } from './tablets/tablets.module';
+import { MaquinasModule } from "./maquinas/maquinas.module";
+import { TabletsModule } from "./tablets/tablets.module";
+import { ApontamentosModule } from "./apontamentos/apontamentos.module";
+import { RelatoriosModule } from "./relatorios/relatorios.module";
+import { ParadasModule } from "./paradas/paradas.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+
     PrismaModule,
     AuthModule,
     UsuariosModule,
@@ -26,11 +31,16 @@ import { TabletsModule } from './tablets/tablets.module';
     OrdensProducaoModule,
     MaquinasModule,
     TabletsModule,
+    ApontamentosModule,
+    RelatoriosModule,
+    ParadasModule,
   ],
+
   controllers: [
     AppController,
     DatabaseController,
   ],
+
   providers: [
     AppService,
   ],

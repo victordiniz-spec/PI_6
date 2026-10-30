@@ -5,32 +5,49 @@ import {
   Factory,
   LayoutDashboard,
   LogOut,
-  UserRoundPlus,
+  Users,
   Package,
   ClipboardList,
   Cog,
   TabletSmartphone,
+  History,
+  ChartColumnIncreasing,
+  Clock3,
 } from "lucide-react";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import Cadastro from "./pages/Cadastro";
 import Produtos from "./pages/Produtos";
 import OrdensProducao from "./pages/OrdensProducao";
 import Maquinas from "./pages/Maquinas";
 import Dispositivos from "./pages/Dispositivos";
+import Usuarios from "./pages/Usuarios";
+import HistoricoProducao from "./pages/HistoricoProducao";
+import Relatorios from "./pages/Relatorios";
+import ParadasProducao from "./pages/ParadasProducao";
 
 import type { LoginResponse } from "./services/api";
 
 import "./App.css";
 
+// ==========================================
+// TELAS DO SISTEMA
+// ==========================================
+
 type Tela =
   | "dashboard"
-  | "cadastro"
+  | "usuarios"
   | "produtos"
   | "ordens-producao"
   | "maquinas"
-  | "dispositivos";
+  | "dispositivos"
+  | "historico-producao"
+  | "relatorios"
+  | "paradas";
+
+// ==========================================
+// COMPONENTE PRINCIPAL
+// ==========================================
 
 export default function App() {
   const [session, setSession] =
@@ -39,13 +56,14 @@ export default function App() {
   const [tela, setTela] =
     useState<Tela>("dashboard");
 
-  const [refreshKey, setRefreshKey] =
-    useState(0);
-
   const logout = useCallback(() => {
     setSession(null);
     setTela("dashboard");
   }, []);
+
+  // ========================================
+  // LOGIN
+  // ========================================
 
   if (!session) {
     return (
@@ -58,17 +76,36 @@ export default function App() {
     );
   }
 
+  // ========================================
+  // PERMISSÕES
+  // ========================================
+
   const isAdmin =
     session.usuario.perfil === "ADMIN";
+
+  const podeVerRelatorios =
+    isAdmin ||
+    session.usuario.perfil === "SUPERVISOR";
+
+  const podeVerHistorico = isAdmin;
 
   function abrirTela(novaTela: Tela) {
     setTela(novaTela);
   }
 
+  const itemAtivo = (nome: Tela) =>
+    `nav-item ${tela === nome ? "active" : ""}`;
+
+  // ========================================
+  // INTERFACE PRINCIPAL
+  // ========================================
+
   return (
     <div className="app-layout">
+
       {/* MENU LATERAL */}
       <aside className="sidebar">
+
         <div className="brand brand-light">
           <span className="brand-mark">
             <Factory size={24} />
@@ -85,35 +122,32 @@ export default function App() {
         </p>
 
         <nav aria-label="Navegação principal">
+
+          {/* DASHBOARD */}
           <button
             type="button"
-            className={`nav-item ${
-              tela === "dashboard" ? "active" : ""
-            }`}
+            className={itemAtivo("dashboard")}
             onClick={() => abrirTela("dashboard")}
           >
             <LayoutDashboard size={19} />
             Visão geral
           </button>
 
+          {/* MENUS ADMINISTRATIVOS */}
           {isAdmin && (
             <>
               <button
                 type="button"
-                className={`nav-item ${
-                  tela === "cadastro" ? "active" : ""
-                }`}
-                onClick={() => abrirTela("cadastro")}
+                className={itemAtivo("usuarios")}
+                onClick={() => abrirTela("usuarios")}
               >
-                <UserRoundPlus size={19} />
-                Cadastrar usuário
+                <Users size={19} />
+                Gestão de usuários
               </button>
 
               <button
                 type="button"
-                className={`nav-item ${
-                  tela === "produtos" ? "active" : ""
-                }`}
+                className={itemAtivo("produtos")}
                 onClick={() => abrirTela("produtos")}
               >
                 <Package size={19} />
@@ -122,11 +156,7 @@ export default function App() {
 
               <button
                 type="button"
-                className={`nav-item ${
-                  tela === "ordens-producao"
-                    ? "active"
-                    : ""
-                }`}
+                className={itemAtivo("ordens-producao")}
                 onClick={() =>
                   abrirTela("ordens-producao")
                 }
@@ -137,9 +167,7 @@ export default function App() {
 
               <button
                 type="button"
-                className={`nav-item ${
-                  tela === "maquinas" ? "active" : ""
-                }`}
+                className={itemAtivo("maquinas")}
                 onClick={() => abrirTela("maquinas")}
               >
                 <Cog size={19} />
@@ -148,11 +176,7 @@ export default function App() {
 
               <button
                 type="button"
-                className={`nav-item ${
-                  tela === "dispositivos"
-                    ? "active"
-                    : ""
-                }`}
+                className={itemAtivo("dispositivos")}
                 onClick={() =>
                   abrirTela("dispositivos")
                 }
@@ -162,9 +186,53 @@ export default function App() {
               </button>
             </>
           )}
+
+          {/* HISTÓRICO DE PRODUÇÃO */}
+          {podeVerHistorico && (
+            <button
+              type="button"
+              className={itemAtivo("historico-producao")}
+              onClick={() =>
+                abrirTela("historico-producao")
+              }
+            >
+              <History size={19} />
+              Histórico de produção
+            </button>
+          )}
+
+          {/* RELATÓRIOS */}
+          {podeVerRelatorios && (
+            <button
+              type="button"
+              className={itemAtivo("relatorios")}
+              onClick={() =>
+                abrirTela("relatorios")
+              }
+            >
+              <ChartColumnIncreasing size={19} />
+              Relatórios
+            </button>
+          )}
+
+          {/* CONTROLE DE PARADAS */}
+          {podeVerRelatorios && (
+            <button
+              type="button"
+              className={itemAtivo("paradas")}
+              onClick={() =>
+                abrirTela("paradas")
+              }
+            >
+              <Clock3 size={19} />
+              Controle de paradas
+            </button>
+          )}
         </nav>
 
+        {/* RODAPÉ DO MENU */}
         <div className="sidebar-bottom">
+
           <div className="sidebar-user">
             <div className="user-avatar">
               {session.usuario.nome
@@ -173,8 +241,13 @@ export default function App() {
             </div>
 
             <div className="sidebar-user-meta">
-              <strong>{session.usuario.nome}</strong>
-              <span>{session.usuario.perfil}</span>
+              <strong>
+                {session.usuario.nome}
+              </strong>
+
+              <span>
+                {session.usuario.perfil}
+              </span>
             </div>
           </div>
 
@@ -191,59 +264,81 @@ export default function App() {
 
       {/* CONTEÚDO PRINCIPAL */}
       <div className="main-column">
+
         <header className="topbar">
-          <span>PRODSYNC / PAINEL DE GESTÃO</span>
+          <span>
+            PRODSYNC / PAINEL DE GESTÃO
+          </span>
+
           <span className="topbar-profile">
             {session.usuario.perfil}
           </span>
         </header>
 
-        <main
-          key={
-            tela === "dashboard"
-              ? refreshKey
-              : undefined
-          }
-        >
-          {tela === "dispositivos" && isAdmin ? (
+        <main>
+
+          {tela === "usuarios" && isAdmin ? (
+            <Usuarios
+              token={session.accessToken}
+              onSessaoExpirada={logout}
+            />
+
+          ) : tela === "dispositivos" && isAdmin ? (
             <Dispositivos
               token={session.accessToken}
               onSessaoExpirada={logout}
             />
+
           ) : tela === "maquinas" && isAdmin ? (
             <Maquinas
               token={session.accessToken}
               onSessaoExpirada={logout}
             />
+
           ) : tela === "produtos" && isAdmin ? (
             <Produtos
               token={session.accessToken}
               onSessaoExpirada={logout}
             />
+
           ) : tela === "ordens-producao" && isAdmin ? (
             <OrdensProducao
               token={session.accessToken}
               perfil={session.usuario.perfil}
             />
-          ) : tela === "cadastro" && isAdmin ? (
-            <Cadastro
+
+          ) : tela === "historico-producao" &&
+              podeVerHistorico ? (
+            <HistoricoProducao
               token={session.accessToken}
-              onVoltar={() => abrirTela("dashboard")}
-              onCriado={() =>
-                setRefreshKey((valor) => valor + 1)
-              }
               onSessaoExpirada={logout}
             />
+
+          ) : tela === "relatorios" &&
+              podeVerRelatorios ? (
+            <Relatorios
+              token={session.accessToken}
+              onSessaoExpirada={logout}
+            />
+
+          ) : tela === "paradas" &&
+              podeVerRelatorios ? (
+            <ParadasProducao
+              token={session.accessToken}
+              onSessaoExpirada={logout}
+            />
+
           ) : (
             <Dashboard
               token={session.accessToken}
               usuario={session.usuario}
               onCadastro={() =>
-                abrirTela("cadastro")
+                abrirTela("usuarios")
               }
               onSessaoExpirada={logout}
             />
           )}
+
         </main>
       </div>
     </div>
