@@ -18,6 +18,9 @@ import { ApontamentosModule } from "./apontamentos/apontamentos.module";
 import { RelatoriosModule } from "./relatorios/relatorios.module";
 import { ParadasModule } from "./paradas/paradas.module";
 
+// Integração com a API do Sankhya
+import { SankhyaModule } from "./sankhya/sankhya.module";
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -34,6 +37,9 @@ import { ParadasModule } from "./paradas/paradas.module";
     ApontamentosModule,
     RelatoriosModule,
     ParadasModule,
+
+    // Módulo responsável pela comunicação com o Sankhya
+    SankhyaModule,
   ],
 
   controllers: [
