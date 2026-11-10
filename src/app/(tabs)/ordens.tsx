@@ -8,6 +8,8 @@ import {
 
 import {
   AlertCircle,
+  ArrowRight,
+  ClipboardList,
   QrCode,
   RefreshCw,
   Search,
@@ -26,7 +28,7 @@ import {
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors } from "@/theme/colors";
+import { useAppTheme, type AppPalette } from "@/theme/colors";
 
 import {
   ErroAPI,
@@ -34,6 +36,16 @@ import {
   type OrdemProducao,
   type SituacaoOP,
 } from "@/services/ordensProducao";
+
+function getColors(p: AppPalette) {
+  return {
+    background: p.background,
+    navy: { 700: p.navy },
+    primary: { 500: p.accent },
+    text: { primary: p.text, secondary: p.secondary, muted: p.muted },
+    success: p.success, warning: p.accent,
+  };
+}
 
 // ==========================================
 // SITUAÇÕES DAS ORDENS
@@ -47,22 +59,22 @@ const nomesSituacoes: Record<SituacaoOP, string> = {
   CANCELADA: "Cancelada",
 };
 
-function corSituacao(situacao: SituacaoOP) {
+function corSituacao(situacao: SituacaoOP, p: AppPalette) {
   switch (situacao) {
     case "EM_PRODUCAO":
-      return colors.success;
+      return p.success;
 
     case "FINALIZADA":
-      return "#167046";
+      return p.success;
 
     case "CANCELADA":
-      return "#B42318";
+      return p.danger;
 
     case "PAUSADA":
-      return "#B45309";
+      return p.accent;
 
     default:
-      return colors.warning;
+      return p.accent;
   }
 }
 
@@ -75,200 +87,177 @@ type OrderCardProps = {
   onPress: () => void;
 };
 
-function OrderCard({
-  ordem,
-  onPress,
-}: OrderCardProps) {
-  const percentual =
-    ordem.quantidadePlanejada > 0
-      ? Math.min(
-          100,
-          Math.max(
-            0,
-            Math.round(
-              (ordem.quantidadeProduzida /
-                ordem.quantidadePlanejada) *
-                100
-            )
-          )
-        )
-      : 0;
+function OrderCard({ ordem, onPress }: OrderCardProps) {
+  const { palette } = useAppTheme();
+  const colors = getColors(palette);
+  const planejado = Number(ordem.quantidadePlanejada) || 0;
+  const produzido = Number(ordem.quantidadeProduzida) || 0;
+  const percentual = planejado > 0
+    ? Math.min(100, Math.max(0, Math.round((produzido / planejado) * 100)))
+    : 0;
+
+  const situacaoCor = corSituacao(ordem.situacao, palette);
+  const formato = (valor: number) => valor.toLocaleString("pt-BR");
 
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Consultar OP ${ordem.numero}`}
-      style={({ pressed }) => ({
-        backgroundColor: "white",
-        borderRadius: 16,
-        padding: 18,
+    // O fundo e a borda ficam em uma View externa para evitar estilos
+    // inconsistentes em Pressable com NativeWind/React Native.
+    <View
+      style={{
+        backgroundColor: palette.surface,
+        borderRadius: 18,
         borderWidth: 1,
-        borderColor: "#E2E8F0",
-        opacity: pressed ? 0.8 : 1,
-      })}
+        borderColor: palette.border,
+        overflow: "hidden",
+        elevation: 2,
+        shadowColor: "#000000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 5,
+      }}
     >
-      {/* NÚMERO E SITUAÇÃO */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 8,
-        }}
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`Ver detalhes da OP ${ordem.numero}`}
+        style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
       >
-        <Text
-          style={{
-            color: colors.navy[700],
-            fontSize: 19,
-            fontWeight: "800",
-          }}
-        >
-          OP #{ordem.numero}
-        </Text>
-
-        <Text
-          style={{
-            color: corSituacao(ordem.situacao),
-            fontWeight: "700",
-            fontSize: 12,
-          }}
-        >
-          {nomesSituacoes[ordem.situacao]}
-        </Text>
-      </View>
-
-      {/* PRODUTO */}
-      <Text
-        style={{
-          color: colors.text.primary,
-          fontSize: 16,
-          fontWeight: "600",
-          marginTop: 12,
-        }}
-      >
-        {ordem.produto?.descricao ??
-          "Produto não identificado"}
-      </Text>
-
-      <Text
-        style={{
-          color: colors.text.secondary,
-          marginTop: 5,
-          fontSize: 13,
-        }}
-      >
-        Código: {ordem.produto?.codigo ?? "—"}
-      </Text>
-
-      {/* QUANTIDADES */}
-      <View
-        style={{
-          marginTop: 16,
-          flexDirection: "row",
-          justifyContent: "space-between",
-          gap: 10,
-        }}
-      >
-        <View>
-          <Text
-            style={{
-              color: colors.text.secondary,
-              fontSize: 12,
-            }}
-          >
-            Planejado
-          </Text>
-
-          <Text
-            style={{
-              color: colors.navy[700],
-              fontSize: 18,
-              fontWeight: "800",
-            }}
-          >
-            {ordem.quantidadePlanejada.toLocaleString(
-              "pt-BR"
-            )}
-          </Text>
-        </View>
-
-        <View>
-          <Text
-            style={{
-              color: colors.text.secondary,
-              fontSize: 12,
-            }}
-          >
-            Produzido
-          </Text>
-
-          <Text
-            style={{
-              color: colors.navy[700],
-              fontSize: 18,
-              fontWeight: "800",
-            }}
-          >
-            {ordem.quantidadeProduzida.toLocaleString(
-              "pt-BR"
-            )}
-          </Text>
-        </View>
-
-        <View>
-          <Text
-            style={{
-              color: colors.text.secondary,
-              fontSize: 12,
-            }}
-          >
-            Progresso
-          </Text>
-
-          <Text
-            style={{
-              color: colors.navy[700],
-              fontSize: 18,
-              fontWeight: "800",
-            }}
-          >
-            {percentual}%
-          </Text>
-        </View>
-      </View>
-
-      {/* BARRA DE PROGRESSO */}
-      <View
-        style={{
-          height: 7,
-          borderRadius: 10,
-          backgroundColor: "#E2E8F0",
-          overflow: "hidden",
-          marginTop: 12,
-        }}
-      >
+        {/* Faixa superior: numero da ordem e situacao */}
         <View
           style={{
-            width: `${percentual}%`,
-            height: "100%",
-            backgroundColor: colors.primary[500],
-            borderRadius: 10,
+            backgroundColor: palette.surfaceAlt,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
           }}
-        />
-      </View>
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1, gap: 8 }}>
+            <ClipboardList size={21} color="#17395C" />
+            <Text style={{ color: palette.navy, fontSize: 18, fontWeight: "800" }}>
+              OP #{ordem.numero}
+            </Text>
+          </View>
 
-      <Text
-        style={{
-          color: colors.text.muted,
-          fontSize: 12,
-          marginTop: 12,
-        }}
-      >
-        Toque para consultar os detalhes da OP
-      </Text>
-    </Pressable>
+          <View
+            style={{
+              backgroundColor: ordem.situacao === "EM_PRODUCAO" ? "#E0F5E9" : "#F0F3F7",
+              borderRadius: 20,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              flexShrink: 1,
+            }}
+          >
+            <Text style={{ color: situacaoCor, fontWeight: "700", fontSize: 11 }}>
+              {nomesSituacoes[ordem.situacao] ?? ordem.situacao}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ height: 1, backgroundColor: palette.border }} />
+
+        <View style={{ padding: 16 }}>
+          {/* Produto */}
+          <Text
+            style={{
+              color: palette.text,
+              fontSize: 15,
+              fontWeight: "700",
+              lineHeight: 22,
+            }}
+          >
+            {ordem.produto?.descricao ?? "Produto não identificado"}
+          </Text>
+          <Text style={{ color: palette.secondary, fontSize: 12, marginTop: 6 }}>
+            Código do produto: {ordem.produto?.codigo ?? "—"}
+          </Text>
+
+          {/* Quantidades em dois blocos bem delimitados */}
+          <View style={{ flexDirection: "row", marginTop: 17, gap: 10 }}>
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: palette.surfaceAlt,
+                borderRadius: 12,
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.secondary, fontSize: 12 }}>Planejado</Text>
+              <Text style={{ color: palette.navy, fontWeight: "800", fontSize: 22, marginTop: 4 }}>
+                {formato(planejado)}
+              </Text>
+            </View>
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: palette.surfaceAlt,
+                borderRadius: 12,
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.secondary, fontSize: 12 }}>Produzido</Text>
+              <Text style={{ color: palette.navy, fontWeight: "800", fontSize: 22, marginTop: 4 }}>
+                {formato(produzido)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Progresso */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: 18,
+              marginBottom: 9,
+            }}
+          >
+            <Text style={{ color: palette.secondary, fontSize: 12 }}>Progresso da produção</Text>
+            <Text style={{ color: palette.navy, fontWeight: "800", fontSize: 14 }}>
+              {percentual}%
+            </Text>
+          </View>
+          <View
+            style={{
+              height: 8,
+              backgroundColor: palette.border,
+              borderRadius: 20,
+              overflow: "hidden",
+            }}
+          >
+            <View
+              style={{
+                height: 8,
+                width: `${percentual}%`,
+                backgroundColor: "#0E9DB1",
+                borderRadius: 20,
+              }}
+            />
+          </View>
+
+          {/* Area de acao. O alinhamento fica na View, nao no texto. */}
+          <View
+            style={{
+              backgroundColor: "#17395C",
+              borderRadius: 12,
+              marginTop: 20,
+              minHeight: 48,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "800" }}>
+                Ver detalhes da OP
+              </Text>
+              <ArrowRight size={18} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </Pressable>
+    </View>
   );
 }
 
@@ -277,6 +266,8 @@ function OrderCard({
 // ==========================================
 
 export default function OrdensScreen() {
+  const { palette } = useAppTheme();
+  const colors = getColors(palette);
   const router = useRouter();
 
   const params =
@@ -491,7 +482,7 @@ export default function OrdensScreen() {
           backgroundColor: "white",
           borderRadius: 12,
           borderWidth: 1,
-          borderColor: "#CBD5E1",
+          borderColor: palette.border,
           alignItems: "center",
           paddingHorizontal: 14,
           marginHorizontal: 22,
@@ -630,7 +621,7 @@ export default function OrdensScreen() {
           contentContainerStyle={{
             paddingHorizontal: 22,
             paddingBottom: 32,
-            gap: 14,
+            gap: 18,
             flexGrow: 1,
           }}
           refreshControl={

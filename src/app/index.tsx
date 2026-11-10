@@ -1,5 +1,12 @@
-import { Boxes, Eye, EyeOff, LockKeyhole, Mail } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  Boxes,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Mail,
+} from "lucide-react-native";
+import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { useRouter, type Href } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import {
@@ -17,10 +24,17 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/theme/colors";
 
-// A URL deve incluir /api e usar o IP do computador no celular físico.
+// Endereco da API deve incluir /api; no celular utilize o IP do computador.
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
 const TOKEN_KEY = "prodsync_access_token";
 const USER_KEY = "prodsync_authenticated_user";
+
+const COR_BOTAO = "#17395C";
+const COR_BOTAO_DESABILITADO = "#5C7894";
+const COR_TEXTO = "#172F42";
+const COR_SECUNDARIA = "#64748B";
+const COR_BORDA = "#CBD5E1";
+const COR_ERRO = "#DC2626";
 
 type UsuarioAutenticado = {
   id: string;
@@ -42,7 +56,9 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+
   const submitting = useRef(false);
+  const passwordInputRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   useEffect(() => {
     const show = Keyboard.addListener(
@@ -123,8 +139,7 @@ export default function LoginScreen() {
 
       setPassword("");
       setShowPassword(false);
-      // Rota real: src/app/autorizacao.tsx.
-      // O cast Href contorna tipos antigos até o Expo Router regenerar as rotas.
+      // Mantem o fluxo atual de autorizacao do tablet.
       router.replace("/autorizacao" as Href);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
@@ -144,11 +159,13 @@ export default function LoginScreen() {
   }
 
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: colors.navy[700] }}>
+    <SafeAreaView
+      edges={["top", "bottom"]}
+      style={{ flex: 1, backgroundColor: colors.navy[700] }}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
           style={{ flex: 1 }}
@@ -157,76 +174,136 @@ export default function LoginScreen() {
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
-          <View style={{ flexGrow: 1, width: "100%", maxWidth: 440, alignSelf: "center", backgroundColor: colors.navy[700] }}>
-            {/* Cabeçalho compacto: deixa o botão Entrar visível em celulares menores. */}
-            <View style={{
-              minHeight: keyboardVisible ? 76 : 170,
-              flexGrow: keyboardVisible ? 0 : 1,
-              alignItems: "center",
-              justifyContent: "center",
-              paddingHorizontal: 24,
-              paddingVertical: keyboardVisible ? 8 : 20,
-            }}>
-              <View style={{
-                height: keyboardVisible ? 38 : 58,
-                width: keyboardVisible ? 38 : 58,
-                borderRadius: 15,
-                backgroundColor: "rgba(255,255,255,0.15)",
+          <View
+            style={{
+              flexGrow: 1,
+              width: "100%",
+              maxWidth: 440,
+              alignSelf: "center",
+              backgroundColor: colors.navy[700],
+            }}
+          >
+            {/* Cabecalho: compacto quando o teclado estiver visivel. */}
+            <View
+              style={{
+                minHeight: keyboardVisible ? 82 : 210,
                 alignItems: "center",
                 justifyContent: "center",
-              }}>
-                <Boxes size={keyboardVisible ? 23 : 32} color={colors.primary[100]} strokeWidth={1.8} />
+                paddingHorizontal: 24,
+                paddingTop: keyboardVisible ? 8 : 24,
+                paddingBottom: keyboardVisible ? 12 : 28,
+              }}
+            >
+              <View
+                style={{
+                  width: keyboardVisible ? 42 : 64,
+                  height: keyboardVisible ? 42 : 64,
+                  borderRadius: 17,
+                  backgroundColor: "rgba(255,255,255,0.15)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Boxes
+                  size={keyboardVisible ? 24 : 35}
+                  color="#FFFFFF"
+                  strokeWidth={1.8}
+                />
               </View>
-              <Text style={{ color: "#FFFFFF", fontSize: keyboardVisible ? 20 : 28, fontWeight: "800", marginTop: 8 }}>
+              <Text
+                style={{
+                  color: "#FFFFFF",
+                  fontSize: keyboardVisible ? 22 : 31,
+                  fontWeight: "800",
+                  marginTop: 10,
+                  letterSpacing: 0.5,
+                }}
+              >
                 PRODSYNC
               </Text>
               {!keyboardVisible && (
                 <>
-                  <Text style={{ color: colors.primary[100], fontSize: 15, marginTop: 3 }}>
+                  <Text style={{ color: colors.primary[100], fontSize: 15, marginTop: 5 }}>
                     Controle de Produção
                   </Text>
-                  <View style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    borderRadius: 99,
-                    borderWidth: 1,
-                    borderColor: "rgba(255,255,255,0.2)",
-                    backgroundColor: "rgba(255,255,255,0.1)",
-                    marginTop: 13,
-                    paddingHorizontal: 17,
-                    paddingVertical: 8,
-                  }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, marginRight: 8, backgroundColor: colors.primary[500] }} />
-                    <Text style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "700" }}>JM FORROS</Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      borderRadius: 99,
+                      borderWidth: 1,
+                      borderColor: "rgba(255,255,255,0.2)",
+                      backgroundColor: "rgba(255,255,255,0.1)",
+                      marginTop: 16,
+                      paddingHorizontal: 18,
+                      paddingVertical: 9,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        marginRight: 9,
+                        backgroundColor: colors.primary[500],
+                      }}
+                    />
+                    <Text style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "700" }}>
+                      JM FORROS
+                    </Text>
                   </View>
                 </>
               )}
             </View>
 
-            <View style={{
-              backgroundColor: colors.background,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              paddingHorizontal: 24,
-              paddingTop: keyboardVisible ? 15 : 24,
-              paddingBottom: keyboardVisible ? 24 : 28,
-            }}>
-              <Text style={{ color: "#0F172A", fontSize: 21, fontWeight: "800" }}>Entrar na sua conta</Text>
-              <Text style={{ color: "#64748B", fontSize: 13, marginTop: 5, lineHeight: 19 }}>
+            {/* Formulario */}
+            <View
+              style={{
+                flexGrow: 1,
+                backgroundColor: colors.background,
+                borderTopLeftRadius: 28,
+                borderTopRightRadius: 28,
+                paddingHorizontal: 24,
+                paddingTop: keyboardVisible ? 18 : 28,
+                paddingBottom: keyboardVisible ? 24 : 32,
+              }}
+            >
+              <Text style={{ color: "#0F172A", fontSize: 23, fontWeight: "800" }}>
+                Entrar na sua conta
+              </Text>
+              <Text
+                style={{
+                  color: COR_SECUNDARIA,
+                  fontSize: 13,
+                  marginTop: 7,
+                  lineHeight: 20,
+                }}
+              >
                 Utilize as credenciais cadastradas no PRODSYNC ERP.
               </Text>
 
-              <View style={{ marginTop: 20 }}>
-                <Text style={{ color: "#172F42", fontSize: 14, fontWeight: "700", marginBottom: 8 }}>E-mail</Text>
-                <View style={{
-                  flexDirection: "row", alignItems: "center", minHeight: 52,
-                  backgroundColor: "#FFFFFF", borderWidth: 1,
-                  borderColor: email.length > 0 && !emailIsValid ? "#DC2626" : "#CBD5E1",
-                  borderRadius: 12, paddingHorizontal: 13,
-                }}>
-                  <Mail size={20} color="#64748B" />
+              {/* E-mail */}
+              <View style={{ marginTop: 24 }}>
+                <Text
+                  style={{ color: COR_TEXTO, fontSize: 14, fontWeight: "700", marginBottom: 9 }}
+                >
+                  E-mail
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    minHeight: 56,
+                    backgroundColor: "#FFFFFF",
+                    borderWidth: 1,
+                    borderColor: email.length > 0 && !emailIsValid ? COR_ERRO : COR_BORDA,
+                    borderRadius: 14,
+                    paddingHorizontal: 15,
+                  }}
+                >
+                  <Mail size={20} color={COR_SECUNDARIA} />
                   <TextInput
-                    style={{ flex: 1, color: "#172F42", fontSize: 16, minHeight: 50, marginLeft: 10 }}
+                    style={{ flex: 1, color: COR_TEXTO, fontSize: 16, minHeight: 54, marginLeft: 12 }}
                     placeholder="Digite seu e-mail"
                     placeholderTextColor="#94A3B8"
                     keyboardType="email-address"
@@ -238,23 +315,39 @@ export default function LoginScreen() {
                     value={email}
                     onChangeText={setEmail}
                     editable={!loading}
+                    onSubmitEditing={() => passwordInputRef.current?.focus()}
                   />
                 </View>
                 {email.length > 0 && !emailIsValid && (
-                  <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 5 }}>Informe um e-mail válido.</Text>
+                  <Text style={{ color: COR_ERRO, fontSize: 12, marginTop: 6 }}>
+                    Informe um e-mail válido.
+                  </Text>
                 )}
               </View>
 
-              <View style={{ marginTop: 17 }}>
-                <Text style={{ color: "#172F42", fontSize: 14, fontWeight: "700", marginBottom: 8 }}>Senha</Text>
-                <View style={{
-                  flexDirection: "row", alignItems: "center", minHeight: 52,
-                  backgroundColor: "#FFFFFF", borderWidth: 1,
-                  borderColor: "#CBD5E1", borderRadius: 12, paddingHorizontal: 13,
-                }}>
-                  <LockKeyhole size={20} color="#64748B" />
+              {/* Senha */}
+              <View style={{ marginTop: 19 }}>
+                <Text
+                  style={{ color: COR_TEXTO, fontSize: 14, fontWeight: "700", marginBottom: 9 }}
+                >
+                  Senha
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    minHeight: 56,
+                    backgroundColor: "#FFFFFF",
+                    borderWidth: 1,
+                    borderColor: COR_BORDA,
+                    borderRadius: 14,
+                    paddingHorizontal: 15,
+                  }}
+                >
+                  <LockKeyhole size={20} color={COR_SECUNDARIA} />
                   <TextInput
-                    style={{ flex: 1, color: "#172F42", fontSize: 16, minHeight: 50, marginLeft: 10 }}
+                    ref={passwordInputRef}
+                    style={{ flex: 1, color: COR_TEXTO, fontSize: 16, minHeight: 54, marginLeft: 12 }}
                     placeholder="Digite sua senha"
                     placeholderTextColor="#94A3B8"
                     secureTextEntry={!showPassword}
@@ -277,48 +370,97 @@ export default function LoginScreen() {
                     disabled={loading}
                     hitSlop={12}
                     onPress={() => setShowPassword((anterior) => !anterior)}
-                    style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}
+                    style={{ width: 42, height: 44, alignItems: "center", justifyContent: "center" }}
                   >
                     {showPassword ? (
-                      <EyeOff size={21} color={colors.navy[700]} />
+                      <EyeOff size={21} color={COR_BOTAO} />
                     ) : (
-                      <Eye size={21} color="#64748B" />
+                      <Eye size={21} color={COR_SECUNDARIA} />
                     )}
                   </Pressable>
                 </View>
               </View>
 
-              <Pressable
-                onPress={() => void handleLogin()}
-                disabled={!formIsValid}
-                accessibilityRole="button"
-                accessibilityLabel="Entrar no PRODSYNC"
-                style={({ pressed }) => ({
-                  marginTop: 20,
-                  minHeight: 54,
-                  borderRadius: 12,
-                  backgroundColor: formIsValid ? colors.navy[700] : "#94A3B8",
-                  flexDirection: "row",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  gap: 9,
-                  opacity: pressed ? 0.8 : 1,
-                })}
+              {/* Botao Entrar: o layout fica em uma View interna com estilos fixos.
+                  Isso evita problemas de alinhamento do Pressable no Android. */}
+              <View
+                style={{
+                  width: "100%",
+                  marginTop: 26,
+                  backgroundColor: formIsValid ? COR_BOTAO : COR_BOTAO_DESABILITADO,
+                  borderRadius: 14,
+                  overflow: "hidden",
+                  elevation: formIsValid ? 3 : 0,
+                }}
               >
-                {loading && <ActivityIndicator size="small" color="#FFFFFF" />}
-                <Text style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "800" }}>
-                  {loading ? "Autenticando..." : "Entrar"}
-                </Text>
-              </Pressable>
+                <Pressable
+                  onPress={() => void handleLogin()}
+                  disabled={!formIsValid}
+                  accessibilityRole="button"
+                  accessibilityLabel="Entrar no PRODSYNC"
+                  accessibilityState={{ disabled: !formIsValid, busy: loading }}
+                  style={{ width: "100%" }}
+                >
+                  <View
+                    style={{
+                      width: "100%",
+                      minHeight: 60,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      paddingHorizontal: 20,
+                      paddingVertical: 14,
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                        <Text
+                          style={{
+                            color: "#FFFFFF",
+                            fontSize: 16,
+                            fontWeight: "700",
+                            marginLeft: 10,
+                            textAlign: "center",
+                          }}
+                        >
+                          Autenticando...
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text
+                          style={{
+                            color: "#FFFFFF",
+                            fontSize: 17,
+                            fontWeight: "800",
+                            letterSpacing: 0.3,
+                            textAlign: "center",
+                          }}
+                        >
+                          Entrar
+                        </Text>
+                        <ArrowRight
+                          size={21}
+                          color="#FFFFFF"
+                          strokeWidth={2.4}
+                          style={{ marginLeft: 10 }}
+                        />
+                      </>
+                    )}
+                  </View>
+                </Pressable>
+              </View>
+
               {loading && (
-                <Text style={{ textAlign: "center", color: "#64748B", fontSize: 12, marginTop: 10 }}>
+                <Text style={{ textAlign: "center", color: COR_SECUNDARIA, fontSize: 12, marginTop: 11 }}>
                   Verificando suas credenciais...
                 </Text>
               )}
 
               {!keyboardVisible && (
                 <>
-                  <View style={{ alignItems: "center", marginTop: 23, gap: 4 }}>
+                  <View style={{ alignItems: "center", marginTop: 28, gap: 5 }}>
                     <Text style={{ color: "#94A3B8", fontSize: 12, textAlign: "center" }}>
                       Autenticação integrada ao PRODSYNC ERP
                     </Text>
@@ -326,11 +468,16 @@ export default function LoginScreen() {
                       Suporte: TI — ramal 3321
                     </Text>
                   </View>
-                  <View style={{
-                    backgroundColor: colors.primary[50],
-                    borderColor: colors.primary[100], borderWidth: 1,
-                    borderRadius: 14, marginTop: 17, padding: 12,
-                  }}>
+                  <View
+                    style={{
+                      backgroundColor: colors.primary[50],
+                      borderColor: colors.primary[100],
+                      borderWidth: 1,
+                      borderRadius: 14,
+                      marginTop: 20,
+                      padding: 14,
+                    }}
+                  >
                     <Text style={{ color: colors.primary[600], textAlign: "center", fontSize: 12 }}>
                       Acesso restrito aos usuários autorizados
                     </Text>

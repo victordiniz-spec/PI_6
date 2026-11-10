@@ -1,4 +1,3 @@
-
 import { CameraView, useCameraPermissions } from "expo-camera";
 import {
   useFocusEffect,
@@ -15,7 +14,7 @@ import {
   ShieldCheck,
 } from "lucide-react-native";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import {
   Pressable,
@@ -26,21 +25,29 @@ import {
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAppTheme, type AppPalette } from "@/theme/colors";
 
-// Cores do Figma do PRODSYNC
-const theme = {
-  background: "#F3F6F8",
-  navy: "#123450",
-  ink: "#172F42",
-  muted: "#5B6E7C",
-  teal: "#007F80",
-  white: "#FFFFFF",
-  border: "#DCE5EB",
-  success: "#167046",
-  successBg: "#E6F5EC",
-};
+// Reutiliza o tema persistente escolhido na aba Mais.
+// A leitura continua local: não enviamos QR Codes ao Sankhya.
+function criarCores(palette: AppPalette) {
+  return {
+    background: palette.background,
+    navy: palette.navy,
+    ink: palette.text,
+    muted: palette.secondary,
+    teal: palette.accent,
+    white: palette.surface,
+    border: palette.border,
+    success: palette.success,
+    successBg: palette.successBg,
+    surfaceAlt: palette.surfaceAlt,
+  };
+}
 
 export default function BipagemScreen() {
+  const { palette } = useAppTheme();
+  const theme = useMemo(() => criarCores(palette), [palette]);
+  const styles = useMemo(() => criarEstilos(theme), [theme]);
   const router = useRouter();
 
   const { op } = useLocalSearchParams<{
@@ -320,7 +327,7 @@ export default function BipagemScreen() {
               >
                 <RotateCcw
                   size={19}
-                  color={theme.white}
+                  color="#FFFFFF"
                 />
 
                 <Text style={styles.primaryText}>
@@ -343,7 +350,8 @@ export default function BipagemScreen() {
 }
 
 // ESTILOS DA TELA
-const styles = StyleSheet.create({
+function criarEstilos(theme: ReturnType<typeof criarCores>) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.background,
@@ -381,7 +389,7 @@ const styles = StyleSheet.create({
   },
 
   notice: {
-    backgroundColor: "#E1F3F2",
+    backgroundColor: theme.surfaceAlt,
     borderRadius: 12,
     padding: 14,
     flexDirection: "row",
@@ -509,7 +517,7 @@ const styles = StyleSheet.create({
     width: 210,
     height: 210,
     borderWidth: 3,
-    borderColor: theme.white,
+    borderColor: "#FFFFFF",
     borderRadius: 18,
   },
 
@@ -571,7 +579,7 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    backgroundColor: theme.navy,
+    backgroundColor: "#173A5C",
     minHeight: 56,
     borderRadius: 12,
     width: "100%",
@@ -583,7 +591,7 @@ const styles = StyleSheet.create({
   },
 
   primaryText: {
-    color: theme.white,
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
   },
@@ -595,3 +603,4 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
+}
